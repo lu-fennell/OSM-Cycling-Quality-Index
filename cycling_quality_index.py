@@ -13,7 +13,7 @@ from os.path import exists
 
 #project directory
 from console.console import _console
-project_dir = os.path.dirname(_console.console.tabEditorWidget.currentWidget().path) + '/'
+project_dir = '/home/fennell/dev/osm/OSM-Cycling-Quality-Index/'
 dir_input = project_dir + 'data/way_import'
 dir_output = project_dir + 'data/cycling_quality_index'
 file_format = '.geojson'
@@ -245,7 +245,17 @@ else:
             sidepath_dict[buffer_id]['checks'] += 1
         layer_path_points_buffers.removeSelection()
         layer_path_points_buffers.select(buffer.id())
-        processing.run('native:selectbylocation', {'INPUT' : layer_roads, 'INTERSECT' : QgsProcessingFeatureSourceDefinition(layer_path_points_buffers.id(), selectedFeaturesOnly=True), 'METHOD' : 0, 'PREDICATE' : [0,6]})
+        processing.run(
+            "native:selectbylocation",
+            {
+                "INPUT": layer_roads,
+                "INTERSECT": QgsProcessingFeatureSourceDefinition(
+                    layer_path_points_buffers.id(), selectedFeaturesOnly=True
+                ),
+                "METHOD": 0,
+                "PREDICATE": [0, 6],
+            },
+        )
 
         id_list = []
         highway_list = []
