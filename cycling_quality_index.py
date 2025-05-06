@@ -8,7 +8,8 @@
 #   > version/date: 2024-04-15                                              #
 #---------------------------------------------------------------------------#
 
-import os, sys, processing, math, time, importlib
+import qgis.processing
+import os, sys, math, time, importlib
 from os.path import exists
 
 #project directory
@@ -28,10 +29,9 @@ importlib.reload(p)
 import definitions as d
 importlib.reload(d)
 
-import  qgis_test as qgt
-importlib.reload(qgt)
-
-trace = qgt.Trace(f"{project_dir}/traceoutput", "original", pretty=True)
+import tracing as tracing
+importlib.reload(tracing)
+trace = tracing.Trace(f"{project_dir}/traceoutput", "first_version", pretty=True)
 
 #--------------------------------
 #      S c r i p t   S t a r t
