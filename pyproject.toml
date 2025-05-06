@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "osm-cycling-quality-index"
+version = "0.1.0"
+description = ""
+authors = ["Lu Fennell <lu-fennell@mailbox.org>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+qgis-stubs = "^0.2.0.post1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
