@@ -8,13 +8,12 @@
 #   > version/date: 2024-04-15                                              #
 #---------------------------------------------------------------------------#
 
-import qgis.processing
-import os, sys, math, time, importlib
+import os, sys, processing, math, time, importlib
 from os.path import exists
 
 #project directory
 from console.console import _console
-project_dir = '/home/fennell/dev/osm/OSM-Cycling-Quality-Index/'
+project_dir = os.path.dirname(_console.console.tabEditorWidget.currentWidget()._editor_code_widget.filePath()) + '/'
 dir_input = project_dir + 'data/way_import'
 dir_output = project_dir + 'data/cycling_quality_index'
 file_format = '.geojson'
@@ -29,9 +28,7 @@ importlib.reload(p)
 import definitions as d
 importlib.reload(d)
 
-import tracing as tracing
-importlib.reload(tracing)
-trace = tracing.Trace(f"{project_dir}/traceoutput", "first_version", pretty=True)
+
 
 #--------------------------------
 #      S c r i p t   S t a r t
@@ -41,7 +38,6 @@ print(time.strftime('%H:%M:%S', time.localtime()), 'Start processing:')
 
 print(time.strftime('%H:%M:%S', time.localtime()), 'Read data...')
 
-# TODO: pretty sure that this does not work.. the ifs are messed up
 #multiple input files can be merged to one single input
 if multi_input:
     input_data = []
@@ -68,7 +64,6 @@ if not exists(dir_input + file_format):
         print(time.strftime('%H:%M:%S', time.localtime()), '[!] Error: No valid input file at "' + dir_input + file_format + '".')
 else:
     layer_way_input = QgsVectorLayer(dir_input + file_format + '|geometrytype=LineString', 'way input', 'ogr')
-    trace.add_layer(layer_way_input, 'input')
 
     print(time.strftime('%H:%M:%S', time.localtime()), 'Reproject data...')
     layer = processing.run('native:reprojectlayer', { 'INPUT' : layer_way_input, 'TARGET_CRS' : QgsCoordinateReferenceSystem(p.crs_metric), 'OUTPUT': 'memory:'})['OUTPUT']
@@ -77,8 +72,6 @@ else:
     print(time.strftime('%H:%M:%S', time.localtime()), 'Prepare data...')
     #delete unneeded attributes
     layer = processing.run('native:retainfields', { 'INPUT' : layer, 'FIELDS' : p.attributes_list, 'OUTPUT': 'memory:'})['OUTPUT']
-
-    trace.add_layer(layer, 'reduced_fields')
 
     #list of new attributes, important for calculating cycling quality index
     new_attributes_dict = {
@@ -154,7 +147,6 @@ else:
                 else:
                     layer.dataProvider().addAttributes([QgsField(attr, QVariant.String)])
         layer.updateFields()
-    trace.add_layer(layer, 'with_extended_attributes')
 
     id_way_type = layer.fields().indexOf('way_type')
     id_index = layer.fields().indexOf('index')
@@ -223,27 +215,20 @@ else:
     print(time.strftime('%H:%M:%S', time.localtime()), '   Create way layers...')
     #create path layer: check all path, footways or cycleways for their sidepath status
     layer_path = processing.run('qgis:extractbyexpression', { 'INPUT' : layer, 'EXPRESSION' : '"highway" IS \'cycleway\' OR "highway" IS \'footway\' OR "highway" IS \'path\' OR "highway" IS \'bridleway\' OR "highway" IS \'steps\'', 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path, 'extracted_layer_path')
     #create road layer: extract all other highway types (except tracks)
     layer_roads = processing.run('qgis:extractbyexpression', { 'INPUT' : layer, 'EXPRESSION' : '"highway" IS NOT \'cycleway\' AND "highway" IS NOT \'footway\' AND "highway" IS NOT \'path\' AND "highway" IS NOT \'bridleway\' AND "highway" IS NOT \'steps\' AND "highway" IS NOT \'track\'', 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path, 'extracted_layer_roads')
 
     print(time.strftime('%H:%M:%S', time.localtime()), '   Create check points...')
     #create "check points" along each segment (to check for near/parallel highways at every checkpoint)
     layer_path_points = processing.run('native:pointsalonglines', {'INPUT' : layer_path, 'DISTANCE' : p.sidepath_buffer_distance, 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points, 'layer_path_points_pointsalonglines')
     layer_path_points_endpoints = processing.run('native:extractspecificvertices', { 'INPUT' : layer_path, 'VERTICES' : '-1', 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points_endpoints, 'layer_path_points_endpoints')
     layer_path_points = processing.run('native:mergevectorlayers', { 'LAYERS' : [layer_path_points, layer_path_points_endpoints], 'OUTPUT': 'memory:'})['OUTPUT']
     #create "check buffers" (to check for near/parallel highways with in the given distance)
     layer_path_points_buffers = processing.run('native:buffer', { 'INPUT' : layer_path_points, 'DISTANCE' : p.sidepath_buffer_size, 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points, 'layer_path_points_buffer')
-
     QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
 
     print(time.strftime('%H:%M:%S', time.localtime()), '   Check for adjacent roads...')
 
-    # TODO: store the sidepath_dict
     #for all check points: Save nearby road id's, names and highway classes in a dict
     sidepath_dict = {}
     for buffer in layer_path_points_buffers.getFeatures():
@@ -260,17 +245,7 @@ else:
             sidepath_dict[buffer_id]['checks'] += 1
         layer_path_points_buffers.removeSelection()
         layer_path_points_buffers.select(buffer.id())
-        processing.run(
-            "native:selectbylocation",
-            {
-                "INPUT": layer_roads,
-                "INTERSECT": QgsProcessingFeatureSourceDefinition(
-                    layer_path_points_buffers.id(), selectedFeaturesOnly=True
-                ),
-                "METHOD": 0,
-                "PREDICATE": [0, 6],
-            },
-        )
+        processing.run('native:selectbylocation', {'INPUT' : layer_roads, 'INTERSECT' : QgsProcessingFeatureSourceDefinition(layer_path_points_buffers.id(), selectedFeaturesOnly=True), 'METHOD' : 0, 'PREDICATE' : [0,6]})
 
         id_list = []
         highway_list = []
@@ -311,8 +286,6 @@ else:
         for highway in maxspeed_dict.keys():
             if not highway in sidepath_dict[buffer_id]['maxspeed'] or sidepath_dict[buffer_id]['maxspeed'][highway] < maxspeed_dict[highway]:
                 sidepath_dict[buffer_id]['maxspeed'][highway] = maxspeed_dict[highway]
-
-    trace.add_dict(sidepath_dict, 'sidepath_dict')
 
     highway_class_list = ['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'unclassified', 'residential', 'road', 'living_street', 'service', 'pedestrian', NULL]
 
@@ -393,7 +366,7 @@ else:
                     layer.changeAttributeValue(feature.id(), layer.fields().indexOf('name'), name)
 
 
-    trace.add_layer(layer, 'sidepaths')
+
     #-------------------------------------------------------------------------------#
     #2: Split and shift attributes/geometries for sidepath mapped on the centerline #
     #-------------------------------------------------------------------------------#
@@ -479,8 +452,6 @@ else:
 
         layer.updateFields()
 
-    trace.add_layer(layer, 'split_and_shift')
-
     #derive attributes for offset ways
     for side in ['left', 'right']:
         for type in ['cycleway', 'sidewalk']:
@@ -523,8 +494,6 @@ else:
                         offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('traffic_mode:right'), d.deriveAttribute(feature, 'traffic_mode:right', type, side, 'str'))
 
                         offset_layer.changeAttributeValue(feature.id(), offset_layer.fields().indexOf('surface:colour'), d.deriveAttribute(feature, 'surface:colour', type, side, 'str'))
-                trace.add_layer(layer, f'derived_attributes_{side}_{type}')
-                
 
     #TODO: Attribute mit "both" auf left und right aufteilen?
 
@@ -532,7 +501,6 @@ else:
 
     #merge vanilla and offset layers
     layer = processing.run('native:mergevectorlayers', {'LAYERS' : [layer, offset_cycleway_left_layer, offset_cycleway_right_layer, offset_sidewalk_left_layer, offset_sidewalk_right_layer], 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer, 'merged')
 
 
 
@@ -717,7 +685,6 @@ else:
 
         layer.updateFields()
 
-    trace.add_layer(layer, 'with_way_types')
 
 
     #----------------------------------------------------#
@@ -1310,7 +1277,7 @@ else:
                 filter_way_type = 'shared traffic'
             layer.changeAttributeValue(feature.id(), id_filter_way_type, filter_way_type)
 
-# TODO: why is this in the same edit?
+
 
             #-------------------------------#
             #5: Calculate index and factors #
@@ -1672,8 +1639,6 @@ else:
 
         layer.updateFields()
 
-    trace.add_layer(layer, 'after_indexing')
-
     #clean up data set and reproject to output crs
     print(time.strftime('%H:%M:%S', time.localtime()), 'Clean up data...')
     layer = processing.run('native:retainfields', { 'INPUT' : layer, 'FIELDS' : p.attributes_list_finally_retained, 'OUTPUT': 'memory:' })['OUTPUT']
@@ -1681,7 +1646,6 @@ else:
 
     print(time.strftime('%H:%M:%S', time.localtime()), 'Save output data set...')
     qgis.core.QgsVectorFileWriter.writeAsVectorFormat(layer, dir_output + file_format, 'utf-8', QgsCoordinateReferenceSystem(p.crs_output), 'GeoJSON')
-    trace.add_layer(layer, 'final_result')
 
     print(time.strftime('%H:%M:%S', time.localtime()), 'Display data...')
     QgsProject.instance().addMapLayer(layer, True)
