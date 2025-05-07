@@ -26,21 +26,20 @@ import os
 import sys
 import math
 import time
+import importlib
 
 from os.path import exists
 
 
-# project directory
 from console.console import _console  # type: ignore[import-not-found]
 
-project_dir = (
-    os.path.dirname(
-        _console.console.tabEditorWidget.currentWidget()._editor_code_widget.filePath()
-    )
-    + "/"
+# TODO: Find a better way to determine the project dir.. maybe through the Qgis project home for now
+project_dir = os.path.dirname(
+    _console.console.tabEditorWidget.currentWidget()._editor_code_widget.filePath()
 )
-dir_input = project_dir + "data/way_import"
-dir_output = project_dir + "data/cycling_quality_index"
+
+dir_input = project_dir + "/data/way_import"
+dir_output = project_dir + "/data/cycling_quality_index"
 file_format = ".geojson"
 multi_input = False  # if "True", it's possible to merge different import files stored in the input directory, marked with an ascending number starting with 1 at the end of the filename (e.g. way_import1.geojson, way_import2.geojson etc.) - can be used to process different areas at the same time or to process a larger area that can't be downloaded in one file
 
@@ -48,8 +47,17 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 import tracing  # noqa: E402
+
+importlib.reload(tracing)
+import cqilib  # noqa: E402
+
+importlib.reload(cqilib)
 import parameter as p  # noqa: E402
+
+importlib.reload(p)
 import definitions as d  # noqa: E402
+
+importlib.reload(d)
 
 trace = tracing.Trace(f"{project_dir}/traceoutput", "refactored", pretty=True)
 
@@ -302,25 +310,12 @@ else:
 
     print(time.strftime("%H:%M:%S", time.localtime()), "Sidepath check...")
     print(time.strftime("%H:%M:%S", time.localtime()), "   Create way layers...")
+
     # create path layer: check all path, footways or cycleways for their sidepath status
-    layer_path = processing.run(
-        "qgis:extractbyexpression",
-        {
-            "INPUT": layer,
-            "EXPRESSION": "\"highway\" IS 'cycleway' OR \"highway\" IS 'footway' OR \"highway\" IS 'path' OR \"highway\" IS 'bridleway' OR \"highway\" IS 'steps'",
-            "OUTPUT": "memory:",
-        },
-    )["OUTPUT"]
+    #
+    layer_path = cqilib.sidepath_create_layer_path(layer)
     trace.add_layer(layer_path, "extracted_layer_path")
-    # create road layer: extract all other highway types (except tracks)
-    layer_roads = processing.run(
-        "qgis:extractbyexpression",
-        {
-            "INPUT": layer,
-            "EXPRESSION": "\"highway\" IS NOT 'cycleway' AND \"highway\" IS NOT 'footway' AND \"highway\" IS NOT 'path' AND \"highway\" IS NOT 'bridleway' AND \"highway\" IS NOT 'steps' AND \"highway\" IS NOT 'track'",
-            "OUTPUT": "memory:",
-        },
-    )["OUTPUT"]
+    layer_roads = cqilib.sidepath_create_layer_roads(layer)
     trace.add_layer(layer_roads, "extracted_layer_roads")
 
     print(time.strftime("%H:%M:%S", time.localtime()), "   Create check points...")
@@ -346,6 +341,7 @@ else:
             "OUTPUT": "memory:",
         },
     )["OUTPUT"]
+    trace.add_layer(layer_path_points, "layer_path_points_merged_with_endpoints")
     # create "check buffers" (to check for near/parallel highways with in the given distance)
     layer_path_points_buffers = processing.run(
         "native:buffer",
@@ -355,88 +351,16 @@ else:
             "OUTPUT": "memory:",
         },
     )["OUTPUT"]
-    trace.add_layer(layer_path_points, "layer_path_points_buffer")
+    trace.add_layer(layer_path_points_buffers, "layer_path_points_buffer")
     QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
 
     print(time.strftime("%H:%M:%S", time.localtime()), "   Check for adjacent roads...")
 
     # for all check points: Save nearby road id's, names and highway classes in a dict
-    # TODO: use a proper class for the entries
-    sidepath_dict : dict = {}
-    for buffer in layer_path_points_buffers.getFeatures():
-        buffer_id = buffer.attribute("id")
-        buffer_layer = buffer.attribute("layer")
-        if buffer_id not in sidepath_dict:
-            sidepath_dict[buffer_id] = {}
-            sidepath_dict[buffer_id]["checks"] = 1
-            sidepath_dict[buffer_id]["id"] = {}
-            sidepath_dict[buffer_id]["highway"] = {}
-            sidepath_dict[buffer_id]["name"] = {}
-            sidepath_dict[buffer_id]["maxspeed"] = {}
-        else:
-            sidepath_dict[buffer_id]["checks"] += 1
-        layer_path_points_buffers.removeSelection()
-        layer_path_points_buffers.select(buffer.id())
-        processing.run(
-            "native:selectbylocation",
-            {
-                "INPUT": layer_roads,
-                "INTERSECT": QgsProcessingFeatureSourceDefinition(
-                    layer_path_points_buffers.id(), selectedFeaturesOnly=True
-                ),
-                "METHOD": 0,
-                "PREDICATE": [0, 6],
-            },
-        )
-
-        id_list = []
-        highway_list = []
-        name_list = []
-        maxspeed_dict : dict[str, float] = {}
-        for road in layer_roads.selectedFeatures():
-            road_layer = road.attribute("layer")
-            if buffer_layer != road_layer:
-                continue  # only consider geometries in the same layer
-            road_id = road.attribute("id")
-            road_highway = road.attribute("highway")
-            road_name = road.attribute("name")
-            road_maxspeed = d.getNumber(road.attribute("maxspeed"))
-            if road_id not in id_list:
-                id_list.append(road_id)
-            if road_highway not in highway_list:
-                highway_list.append(road_highway)
-            if (
-                road_highway not in maxspeed_dict
-                or maxspeed_dict[road_highway] < road_maxspeed
-            ):
-                maxspeed_dict[road_highway] = road_maxspeed
-            if road_name not in name_list:
-                name_list.append(road_name)
-        for road_id in id_list:
-            if road_id in sidepath_dict[buffer_id]["id"]:
-                sidepath_dict[buffer_id]["id"][road_id] += 1
-            else:
-                sidepath_dict[buffer_id]["id"][road_id] = 1
-        for road_highway in highway_list:
-            if road_highway in sidepath_dict[buffer_id]["highway"]:
-                sidepath_dict[buffer_id]["highway"][road_highway] += 1
-            else:
-                sidepath_dict[buffer_id]["highway"][road_highway] = 1
-        for road_name in name_list:
-            if road_name in sidepath_dict[buffer_id]["name"]:
-                sidepath_dict[buffer_id]["name"][road_name] += 1
-            else:
-                sidepath_dict[buffer_id]["name"][road_name] = 1
-
-        for highway in maxspeed_dict.keys():
-            if (
-                highway not in sidepath_dict[buffer_id]["maxspeed"]
-                or sidepath_dict[buffer_id]["maxspeed"][highway]
-                < maxspeed_dict[highway]
-            ):
-                sidepath_dict[buffer_id]["maxspeed"][highway] = maxspeed_dict[highway]
-
+    sidepath_dict: dict = cqilib.sidepath_dict(layer_path_points_buffers, layer_roads)
     trace.add_dict(sidepath_dict, "sidepath_dict")
+
+    # TODO: why is this not in "definitions" or "parameters"
     highway_class_list = [
         "motorway",
         "motorway_link",
@@ -2638,7 +2562,7 @@ else:
     print(time.strftime("%H:%M:%S", time.localtime()), "Display data...")
     QgsProject.instance().addMapLayer(layer, True)
     layer.setName("Cycling Quality Index")
-    layer.loadNamedStyle(project_dir + "styles/index.qml")
+    layer.loadNamedStyle(project_dir + "/styles/index.qml")
     # focus on output layer
     iface.mapCanvas().setExtent(layer.extent())
 

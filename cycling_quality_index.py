@@ -233,9 +233,10 @@ else:
     layer_path_points_endpoints = processing.run('native:extractspecificvertices', { 'INPUT' : layer_path, 'VERTICES' : '-1', 'OUTPUT': 'memory:'})['OUTPUT']
     trace.add_layer(layer_path_points_endpoints, 'layer_path_points_endpoints')
     layer_path_points = processing.run('native:mergevectorlayers', { 'LAYERS' : [layer_path_points, layer_path_points_endpoints], 'OUTPUT': 'memory:'})['OUTPUT']
+    trace.add_layer(layer_path_points, "layer_path_points_merged_with_endpoints")
     #create "check buffers" (to check for near/parallel highways with in the given distance)
     layer_path_points_buffers = processing.run('native:buffer', { 'INPUT' : layer_path_points, 'DISTANCE' : p.sidepath_buffer_size, 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points, 'layer_path_points_buffer')
+    trace.add_layer(layer_path_points_buffers, 'layer_path_points_buffer')
     QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
 
     print(time.strftime('%H:%M:%S', time.localtime()), '   Check for adjacent roads...')
