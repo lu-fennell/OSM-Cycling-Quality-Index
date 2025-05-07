@@ -8,6 +8,7 @@ from PyQt5.QtCore import QVariant
 class Trace:
     def __init__(self, tracing_out_dir: str, session_name: str, pretty: bool = False):
         self.session_name = session_name
+        self.tracing_dir = tracing_out_dir
 
         self.out_dir = f"{tracing_out_dir}/{session_name}"
         self.pretty = pretty

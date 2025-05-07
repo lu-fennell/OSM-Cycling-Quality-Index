@@ -1,3 +1,4 @@
+from qgis.core import NULL  # type: ignore[attr-defined]
 #coordinate reference systems...
 #...for the output file
 crs_output = 'EPSG:4326'
@@ -108,7 +109,6 @@ surface_factor_dict = {
     'paving_stones': 0.7,
     'compacted': 0.7,
     'fine_gravel': 0.7,
-    'paving_stones': 0.7,
     'concrete:plates': 0.7,
     'bricks': 0.7,
     'sett': 0.3,
@@ -187,7 +187,6 @@ highway_factor_dict_weights = {
     'cycle path': 0
 }
 
-from qgis.core import NULL
 separation_level_dict = {
     'no': 0,
     'none': 0,
@@ -489,13 +488,6 @@ attributes_list_finally_retained = [
     'fac_surface',
     'fac_highway',
     'fac_maxspeed',
-#    'fac_protection_level',
-#    'prot_level_separation_left',
-#    'prot_level_separation_right',
-#    'prot_level_buffer_left',
-#    'prot_level_buffer_right',
-#    'prot_level_left',
-#    'prot_level_right',
     'base_index',
     'fac_1',
     'fac_2',

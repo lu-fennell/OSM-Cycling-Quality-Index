@@ -143,12 +143,6 @@ def compare_changes(d: str) -> list[str]:
               print(':', colorize('OK', Color.GREEN))
     return errors
 
-
-parser = argparse.ArgumentParser(description='compare two directories with json/geojson files or two json/geojson files for equality')
-parser.add_argument('f1', metavar='FILE_OR_DIRECTORY')
-parser.add_argument('f2', metavar='FILE_OR_DIRECTORY', nargs='?')
-args = parser.parse_args()
-
 class InputFileType(Enum):
     GEOJSON = 1
     JSON = 2
@@ -163,32 +157,44 @@ def input_file_type(f: str) -> InputFileType:
         # TODO: maybe check that this is a dir?
         return InputFileType.DIR
 
-if args.f2 is None and input_file_type(args.f1) == InputFileType.DIR:
-    compare_changes(args.f1)
-else:
-    t1 = input_file_type(args.f1)
-    t2 = input_file_type(args.f2)
-    if t1 != t2:
-        raise Exception(f'Incompatible input files {t1} and {t2}. Both files have to be the same type')
+def run(f1: str, f2: str | None) -> bool:
+    if f2 is None and input_file_type(f1) == InputFileType.DIR:
+        errors = compare_changes(f1)
+        return not errors
+    elif f2 is not None:
+        t1 = input_file_type(f1)
+        t2 = input_file_type(f2)
+        if t1 != t2:
+            raise Exception(f'Incompatible input files {t1} and {t2}. Both files have to be the same type')
 
-    if t1 == InputFileType.GEOJSON:
-        errors = compare_geojson(args.f1, args.f2)
-    elif t1 == InputFileType.JSON:
-        errors = compare_json(args.f1, args.f2)
-    elif t1 == InputFileType.DIR:
-        errors = compare_dirs(args.f1, args.f2)
+        if t1 == InputFileType.GEOJSON:
+            errors = compare_geojson(f1, f2)
+        elif t1 == InputFileType.JSON:
+            errors = compare_json(f1, f2)
+        elif t1 == InputFileType.DIR:
+            errors = compare_dirs(f1, f2)
+        else:
+            raise Exception(f'Input file type {t1} not yet implemented')
+        if not errors:
+            print("SAME")
+            return True
+        else:
+            print("DIFFERENT")
+            for e in errors:
+                print(f'* {e}')
+            return False
     else:
-        raise Exception(f'Input file type {t1} not yet implemented')
+        raise Exception(f'{f1} is not a directory and only one file is provided. This combination of arguments is not supported')
+    
 
-
-
-    if not errors:
-        print("SAME")
-    else:
-        print("DIFFERENT")
-        for e in errors:
-            print(f'* {e}')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='compare two directories with json/geojson files or two json/geojson files for equality')
+    parser.add_argument('f1', metavar='FILE_OR_DIRECTORY')
+    parser.add_argument('f2', metavar='FILE_OR_DIRECTORY', nargs='?')
+    args = parser.parse_args()
+    if not run(args.f1, args.f2):
         sys.exit(-1)
+
 
 
 
