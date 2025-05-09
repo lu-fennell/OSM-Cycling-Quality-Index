@@ -13,12 +13,12 @@ import importlib
 
 import cqilib
 importlib.reload(cqilib)
-from dataclasses import dataclass  # noqa: E402
-from collections.abc import Callable  # noqa: E402
-from abc import ABC,abstractmethod  # noqa: E402
-import tracing  # noqa: E402
+from dataclasses import dataclass  
+from collections.abc import Callable  
+from abc import ABC,abstractmethod  
+import tracing  
 importlib.reload(tracing)
-import compare_traces  # noqa: E402
+import compare_traces  
 importlib.reload(compare_traces)
 
 # TODO: Find a better way to determine the project dir.. maybe through the Qgis project home for now
