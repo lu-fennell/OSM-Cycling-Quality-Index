@@ -19,8 +19,8 @@ import sys
 import math
 import time
 from pathlib import Path
+from dataclasses import dataclass
 
-# TODO: as a parameter maybe?
 import definitions as d
 
 
@@ -44,6 +44,110 @@ def process_to_mem_layer(name: str, opts: dict) -> QgsVectorLayer:
     opts = opts.copy()
     opts["OUTPUT"] = "memory:"
     return processing.run(name, opts)["OUTPUT"]
+
+def fixup_input_layer(layer_way_input: QgsVectorLayer, crs_metric: str, attributes_list: list[str]) -> QgsVectorLayer:
+    
+    layer = processing.run(
+        "native:reprojectlayer",
+        {
+            "INPUT": layer_way_input,
+            "TARGET_CRS": QgsCoordinateReferenceSystem(crs_metric),
+            "OUTPUT": "memory:",
+        },
+    )["OUTPUT"]
+
+    # delete unneeded attributes
+    layer = processing.run(
+        "native:retainfields",
+        {"INPUT": layer, "FIELDS": attributes_list, "OUTPUT": "memory:"},
+    )["OUTPUT"]
+    return layer
+
+# TODO: don't use the in-out param "attributes_list"
+def add_cyling_attributes(layer: QgsVectorLayer, attributes_list: list[str]) -> QgsVectorLayer:
+    # list of new attributes, important for calculating cycling quality index
+    new_attributes_dict = {
+        "way_type": "String",
+        "index": "Int",
+        "index_10": "Int",
+        "stress_level": "Int",
+        "offset": "Double",
+        "offset_cycleway_left": "Double",
+        "offset_cycleway_right": "Double",
+        "offset_sidewalk_left": "Double",
+        "offset_sidewalk_right": "Double",
+        "type": "String",
+        "side": "String",
+        "proc_width": "Double",
+        "proc_surface": "String",
+        "proc_smoothness": "String",
+        "proc_oneway": "String",
+        "proc_sidepath": "String",
+        "proc_highway": "String",
+        "proc_maxspeed": "Int",
+        "proc_traffic_mode_left": "String",
+        "proc_traffic_mode_right": "String",
+        "proc_separation_left": "String",
+        "proc_separation_right": "String",
+        "proc_buffer_left": "Double",
+        "proc_buffer_right": "Double",
+        "proc_mandatory": "String",
+        "proc_traffic_sign": "String",
+        "fac_width": "Double",
+        "fac_surface": "Double",
+        "fac_highway": "Double",
+        "fac_maxspeed": "Double",
+        "fac_protection_level": "Double",
+        "prot_level_separation_left": "Double",
+        "prot_level_separation_right": "Double",
+        "prot_level_buffer_left": "Double",
+        "prot_level_buffer_right": "Double",
+        "prot_level_left": "Double",
+        "prot_level_right": "Double",
+        "base_index": "Int",
+        "fac_1": "Double",
+        "fac_2": "Double",
+        "fac_3": "Double",
+        "fac_4": "Double",
+        "data_bonus": "String",
+        "data_malus": "String",
+        "data_incompleteness": "Double",
+        "data_missing": "String",
+        "data_missing_width": "Int",
+        "data_missing_surface": "Int",
+        "data_missing_smoothness": "Int",
+        "data_missing_maxspeed": "Int",
+        "data_missing_parking": "Int",
+        "data_missing_lit": "Int",
+        "filter_usable": "Int",
+        "filter_way_type": "String",
+    }
+    for attr in list(new_attributes_dict.keys()):
+        attributes_list.append(attr)
+
+    # make sure all attributes are existing in the table to prevent errors when asking for a missing one
+    with edit(layer):
+        for attr in attributes_list:
+            if layer.fields().indexOf(attr) == -1:
+                if attr in new_attributes_dict:
+                    if new_attributes_dict[attr] == "Double":
+                        layer.dataProvider().addAttributes(
+                            [QgsField(attr, QVariant.Double)]
+                        )
+                    elif new_attributes_dict[attr] == "Int":
+                        layer.dataProvider().addAttributes(
+                            [QgsField(attr, QVariant.Int)]
+                        )
+                    else:
+                        layer.dataProvider().addAttributes(
+                            [QgsField(attr, QVariant.String)]
+                        )
+                else:
+                    layer.dataProvider().addAttributes(
+                        [QgsField(attr, QVariant.String)]
+                    )
+        layer.updateFields()
+    return layer
 
 
 def sidepath_create_layer_path(layer: QgsVectorLayer) -> QgsVectorLayer:
@@ -156,3 +260,125 @@ def sidepath_dict(
                 sidepath_dict[buffer_id]["maxspeed"][highway] = maxspeed_dict[highway]
 
     return sidepath_dict
+
+@dataclass
+class SidepathClassificationAttributes:
+    id_proc_sidepath: int
+    id_proc_highway: int
+    id_proc_maxspeed: int
+
+def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: SidepathClassificationAttributes):
+    # TODO: why is this not in "definitions" or "parameters"
+    highway_class_list = [
+        "motorway",
+        "motorway_link",
+        "trunk",
+        "trunk_link",
+        "primary",
+        "primary_link",
+        "secondary",
+        "secondary_link",
+        "tertiary",
+        "tertiary_link",
+        "unclassified",
+        "residential",
+        "road",
+        "living_street",
+        "service",
+        "pedestrian",
+        NULL,
+    ]
+
+    # a path is considered a sidepath if at least two thirds of its check points are found to be close to road segments with the same OSM ID, highway class or street name
+    with edit(layer):
+        for feature in layer.getFeatures():
+            hw = feature.attribute("highway")
+            maxspeed = feature.attribute("maxspeed")
+            if maxspeed == "walk" or (not maxspeed and hw == "living_street"):
+                maxspeed = 10
+            if maxspeed == "none":
+                maxspeed = 299
+            if not maxspeed and hw == "living_street":
+                maxspeed = 10
+            if hw not in ["cycleway", "footway", "path", "bridleway", "steps"]:
+                layer.changeAttributeValue(feature.id(), attrs.id_proc_highway, hw)
+                layer.changeAttributeValue(
+                    feature.id(), attrs.id_proc_maxspeed, d.getNumber(maxspeed)
+                )
+                continue
+            id = feature.attribute("id")
+            is_sidepath = feature.attribute("is_sidepath")
+            if feature.attribute("footway") == "sidewalk":
+                is_sidepath = "yes"
+            is_sidepath_of = feature.attribute("is_sidepath:of")
+            checks = sidepath_dict[id]["checks"]
+
+            if not is_sidepath:
+                is_sidepath = "no"
+
+                for road_id in sidepath_dict[id]["id"].keys():
+                    if checks <= 2:
+                        if sidepath_dict[id]["id"][road_id] == checks:
+                            is_sidepath = "yes"
+                    else:
+                        if sidepath_dict[id]["id"][road_id] >= checks * 0.66:
+                            is_sidepath = "yes"
+
+                if is_sidepath != "yes":
+                    for highway in sidepath_dict[id]["highway"].keys():
+                        if checks <= 2:
+                            if sidepath_dict[id]["highway"][highway] == checks:
+                                is_sidepath = "yes"
+                        else:
+                            if sidepath_dict[id]["highway"][highway] >= checks * 0.66:
+                                is_sidepath = "yes"
+
+                if is_sidepath != "yes":
+                    for name in sidepath_dict[id]["name"].keys():
+                        if checks <= 2:
+                            if sidepath_dict[id]["name"][name] == checks:
+                                is_sidepath = "yes"
+                        else:
+                            if sidepath_dict[id]["name"][name] >= checks * 0.66:
+                                is_sidepath = "yes"
+
+            layer.changeAttributeValue(feature.id(), attrs.id_proc_sidepath, is_sidepath)
+
+            # derive the highway class of the associated road
+            if not is_sidepath_of and is_sidepath == "yes":
+                if len(sidepath_dict[id]["highway"]):
+                    max_value = max(sidepath_dict[id]["highway"].values())
+                    max_keys = [
+                        key
+                        for key, value in sidepath_dict[id]["highway"].items()
+                        if value == max_value
+                    ]
+                    min_index = len(highway_class_list) - 1
+                    for key in max_keys:
+                        if highway_class_list.index(key) < min_index:
+                            min_index = highway_class_list.index(key)
+                    is_sidepath_of = highway_class_list[min_index]
+
+            layer.changeAttributeValue(feature.id(), attrs.id_proc_highway, is_sidepath_of)
+
+            if (
+                is_sidepath == "yes"
+                and is_sidepath_of
+                and is_sidepath_of in sidepath_dict[id]["maxspeed"]
+            ):
+                maxspeed = sidepath_dict[id]["maxspeed"][is_sidepath_of]
+                if maxspeed:
+                    layer.changeAttributeValue(
+                        feature.id(), attrs.id_proc_maxspeed, d.getNumber(maxspeed)
+                    )
+            # transfer names to sidepath
+            if is_sidepath == "yes" and len(sidepath_dict[id]["name"]):
+                name = max(
+                    sidepath_dict[id]["name"],
+                    key=lambda k: sidepath_dict[id]["name"][k],
+                )  # the most frequent name in the surrounding
+                if name:
+                    layer.changeAttributeValue(
+                        feature.id(), layer.fields().indexOf("name"), name
+                    )
+

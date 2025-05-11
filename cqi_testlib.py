@@ -7,6 +7,7 @@ from qgis.core import (
 import os
 import time
 import importlib
+import json
 from dataclasses import dataclass  
 from collections.abc import Callable  
 from abc import ABC,abstractmethod  
@@ -45,6 +46,12 @@ class TestProject:
         QgsProject.instance().addMapLayer(layer, addToLegend=False)
         return layer
 
+    # TODO: probably fix for qvariant
+    def read_input_dict(self, name: str) -> dict:
+        with open(self.input_file(name, 'json')) as f:
+            result = json.load(f)
+        return result
+
     def run_checks(self, checks: list[Check] ):
         os.makedirs(self.out_dir(), exist_ok=True)
     
@@ -81,6 +88,20 @@ class LayerCheck(Check):
     def check(self, prj: TestProject) -> list[str]: 
         input_layer = prj.read_input_layer(self.input)
         output_layer = self.fun(input_layer)
+        out_file = tracing.write_layer(prj.out_dir(), self.expected, output_layer)
+        return compare_traces.compare_geojson(out_file, prj.input_file(self.expected, 'geojson'))
+
+@dataclass
+class LayerCheck2(Check):
+    fun: Callable[[QgsVectorLayer, dict], QgsVectorLayer]
+    input1: str
+    input2: str
+    expected: str
+
+    def check(self, prj: TestProject) -> list[str]: 
+        input_layer = prj.read_input_layer(self.input1)
+        d = prj.read_input_dict(self.input2)
+        output_layer = self.fun(input_layer, d)
         out_file = tracing.write_layer(prj.out_dir(), self.expected, output_layer)
         return compare_traces.compare_geojson(out_file, prj.input_file(self.expected, 'geojson'))
 

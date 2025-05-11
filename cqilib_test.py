@@ -6,12 +6,16 @@ import cqilib
 importlib.reload(cqilib)
 import cqi_testlib
 importlib.reload(cqi_testlib)
-from cqi_testlib import LayerCheck, DictCheck2, TestProject
+from cqi_testlib import LayerCheck, LayerCheck2, DictCheck2, TestProject
+
+def sidepath_classification_testwrapper(layer: QgsVectorLayer, sidepath_dict: dict):
+    return layer
 
 checks = [
     LayerCheck(cqilib.sidepath_create_layer_path, '03_with_extended_attributes', '04_extracted_layer_path'),
     LayerCheck(cqilib.sidepath_create_layer_roads, '03_with_extended_attributes', '05_extracted_layer_roads'),
     DictCheck2(cqilib.sidepath_dict, '09_layer_path_points_buffer', '05_extracted_layer_roads', '10_sidepath_dict'),
+    LayerCheck2(sidepath_classification_testwrapper, '03_with_extended_attributes', '10_sidepath_dict', '11_sidepaths'),
 ]
 
 # TODO: Find a better way to determine the project dir.. maybe through the Qgis project home for now
