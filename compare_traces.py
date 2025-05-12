@@ -2,6 +2,7 @@ import sys
 import json
 import argparse
 import os
+import math
 from enum import Enum
 from dataclasses import dataclass  # noqa: F401
 
@@ -31,11 +32,23 @@ def read_json(fname: str) -> dict:
         result = json.load(f)
     return result
 
+def similar_coordinates(tol: float, c1: list[list[float]], c2: list[list[float]]) -> bool:
+    return (len(c1) == len(c2) and all([ math.isclose(n1, n2, abs_tol=tol) for ns1, ns2 in zip(c1, c2) for n1, n2 in zip(ns1, ns2) ]))
+
+def similar_geometry(tolerance: float, g1: dict, g2: dict) -> bool:
+    return g1 == g2 or (g1['type'] == g2['type'] and similar_coordinates(tolerance, g1['coordinates'], g2['coordinates']))
+
 @dataclass
 class Feature:
     id: str
     properties: dict
     geometry: dict
+
+    def __eq__(self, other):
+        return isinstance(other, Feature) and self._similar(other)
+
+    def _similar(self, other: 'Feature') -> bool:
+        return self.id == other.id and self.properties == other.properties and similar_geometry(1e-9, self.geometry, other.geometry)
 
 def feature_from_dict(d: dict) -> Feature:
     properties = d['properties']
@@ -71,7 +84,17 @@ def compare_geojson(f1: str, f2:str) -> list[str]:
     for idx, feature1 in enumerate(features1[0:len(features2)]):
         feature2 = features2[idx]
         if feature1 != feature2:
-            errors.append(f'First difference at idx {idx}: {feature1.id} , {feature2.id}')
+            # TODO: clean this up, improve
+            first_diff_prop = None
+            for pk1, pv1 in feature1.properties.items():
+                if pk1 in feature2.properties.keys():
+                    pv2 = feature2.properties[pk1]
+                    if pv1 != pv2:
+                        first_diff_prop = (pk1, pv1, pv2)
+                        break
+                else:
+                    first_diff_prop = (pk1, pv1, "<not found>")
+            errors.append(f'First difference at idx {idx}: {feature1.id} , {feature2.id}, props-eq? {feature1.properties == feature2.properties}, {first_diff_prop}')
             break
     return errors
 

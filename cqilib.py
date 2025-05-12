@@ -63,10 +63,7 @@ def fixup_input_layer(layer_way_input: QgsVectorLayer, crs_metric: str, attribut
     )["OUTPUT"]
     return layer
 
-# TODO: don't use the in-out param "attributes_list"
-def add_cyling_attributes(layer: QgsVectorLayer, attributes_list: list[str]) -> QgsVectorLayer:
-    # list of new attributes, important for calculating cycling quality index
-    new_attributes_dict = {
+new_attributes_dict = {
         "way_type": "String",
         "index": "Int",
         "index_10": "Int",
@@ -122,6 +119,28 @@ def add_cyling_attributes(layer: QgsVectorLayer, attributes_list: list[str]) -> 
         "filter_usable": "Int",
         "filter_way_type": "String",
     }
+
+# TODO: clean this up
+def ensure_cycling_attribute_types(layer: QgsVectorLayer):
+    with edit(layer):
+        fields = layer.dataProvider().fields()
+        for attr, ty in new_attributes_dict.items():
+            attr_idx = fields.indexOf(attr)
+            print('TODO', attr_idx)
+            if ty == "Double":
+                fields.at(attr_idx).setType(QVariant.Double)
+            elif ty == "Int":
+                print('TODO', attr)
+                fields.at(attr_idx).setType(QVariant.Int)
+        layer.updateFields()
+    idx = layer.fields().indexOf('proc_maxspeed')
+    print('TODO', layer.fields().at(idx).typeName(), layer.fields().at(idx).type() == QVariant.Int)
+     
+# TODO: don't use the in-out param "attributes_list"
+def add_cyling_attributes(layer: QgsVectorLayer, attributes_list: list[str]) -> QgsVectorLayer:
+    # list of new attributes, important for calculating cycling quality index
+    
+    # TODO: this is a weird "in-out" parameter
     for attr in list(new_attributes_dict.keys()):
         attributes_list.append(attr)
 
@@ -173,6 +192,7 @@ def sidepath_create_layer_roads(layer: QgsVectorLayer) -> QgsVectorLayer:
     )
 
 
+
 # TODO: use a proper class for the entries of the dict
 def sidepath_dict(
     layer_path_points_buffers: QgsVectorLayer, layer_roads: QgsVectorLayer
@@ -218,21 +238,26 @@ def sidepath_dict(
         maxspeed_dict: dict[str, float] = {}
         for road in layer_roads.selectedFeatures():
             road_layer = road.attribute("layer")
+            # TODO: is this happening? How can this happen?
             if buffer_layer != road_layer:
                 continue  # only consider geometries in the same layer
             road_id = road.attribute("id")
             road_highway = road.attribute("highway")
             road_name = road.attribute("name")
             road_maxspeed = d.getNumber(road.attribute("maxspeed"))
+            # TODO: these lists are sets
             if road_id not in id_list:
                 id_list.append(road_id)
+            # TODO: these lists are sets
             if road_highway not in highway_list:
                 highway_list.append(road_highway)
+            # TODO: probably should be a method on a maxspeed_dict wrapper
             if (
                 road_highway not in maxspeed_dict
                 or maxspeed_dict[road_highway] < road_maxspeed
             ):
                 maxspeed_dict[road_highway] = road_maxspeed
+            # TODO: these lists are sets
             if road_name not in name_list:
                 name_list.append(road_name)
         for road_id in id_list:
@@ -267,6 +292,17 @@ class SidepathClassificationAttributes:
     id_proc_highway: int
     id_proc_maxspeed: int
 
+
+def sidepath_classification_attrs(layer:QgsVectorLayer) -> SidepathClassificationAttributes:
+    id_proc_sidepath = layer.fields().indexOf("proc_sidepath")
+    id_proc_highway = layer.fields().indexOf("proc_highway")
+    id_proc_maxspeed = layer.fields().indexOf("proc_maxspeed")
+    return SidepathClassificationAttributes(
+           id_proc_sidepath=id_proc_sidepath,
+           id_proc_highway=id_proc_highway,
+           id_proc_maxspeed=id_proc_maxspeed
+       )
+
 def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: SidepathClassificationAttributes):
     # TODO: why is this not in "definitions" or "parameters"
     highway_class_list = [
@@ -294,6 +330,7 @@ def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: S
         for feature in layer.getFeatures():
             hw = feature.attribute("highway")
             maxspeed = feature.attribute("maxspeed")
+            # TODO: this is redundant
             if maxspeed == "walk" or (not maxspeed and hw == "living_street"):
                 maxspeed = 10
             if maxspeed == "none":

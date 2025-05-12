@@ -207,21 +207,17 @@ else:
     sidepath_dict: dict = cqilib.sidepath_dict(layer_path_points_buffers, layer_roads)
     trace.add_dict(sidepath_dict, "sidepath_dict")
 
-    id_proc_sidepath = layer.fields().indexOf("proc_sidepath")
-    id_proc_highway = layer.fields().indexOf("proc_highway")
-    id_proc_maxspeed = layer.fields().indexOf("proc_maxspeed")
-
+    sidepath_attrs =  cqilib.sidepath_classification_attrs(layer)
     cqilib.sidepath_classification(
        layer,
        sidepath_dict,
-       cqilib.SidepathClassificationAttributes(
-           id_proc_sidepath=id_proc_sidepath,
-           id_proc_highway=id_proc_highway,
-           id_proc_maxspeed=id_proc_maxspeed
-       )
+        sidepath_attrs       
    )
     trace.add_layer(layer, "sidepaths")
 
+    id_proc_sidepath = sidepath_attrs.id_proc_sidepath
+    id_proc_highway = sidepath_attrs.id_proc_highway
+    id_proc_maxspeed = sidepath_attrs.id_proc_maxspeed
     id_way_type = layer.fields().indexOf("way_type")
     id_index = layer.fields().indexOf("index")
     id_index_10 = layer.fields().indexOf("index_10")

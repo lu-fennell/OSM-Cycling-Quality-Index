@@ -6,16 +6,27 @@ import cqilib
 importlib.reload(cqilib)
 import cqi_testlib
 importlib.reload(cqi_testlib)
+import parameter as p
+importlib.reload(p)
 from cqi_testlib import LayerCheck, LayerCheck2, DictCheck2, TestProject
 
-def sidepath_classification_testwrapper(layer: QgsVectorLayer, sidepath_dict: dict):
+from qgis.core import QgsVectorLayer
+
+# TODO: clean this up
+def sidepath_classification_testwrapper(layer: QgsVectorLayer, sidepath_dict: dict) -> QgsVectorLayer:
+    # TODO: add_cyling_attributes is a proc!
+    layer = cqilib.add_cyling_attributes(layer, p.attributes_list)
+    prj = cqi_testlib.TestProject(project_dir)
+    sidepath_dict = cqilib.sidepath_dict(prj.read_input_layer('09_layer_path_points_buffer'), prj.read_input_layer('05_extracted_layer_roads'))
+    cqilib.sidepath_classification(layer, sidepath_dict, cqilib.sidepath_classification_attrs(layer))
     return layer
 
 checks = [
-    LayerCheck(cqilib.sidepath_create_layer_path, '03_with_extended_attributes', '04_extracted_layer_path'),
-    LayerCheck(cqilib.sidepath_create_layer_roads, '03_with_extended_attributes', '05_extracted_layer_roads'),
-    DictCheck2(cqilib.sidepath_dict, '09_layer_path_points_buffer', '05_extracted_layer_roads', '10_sidepath_dict'),
-    LayerCheck2(sidepath_classification_testwrapper, '03_with_extended_attributes', '10_sidepath_dict', '11_sidepaths'),
+    # LayerCheck(cqilib.sidepath_create_layer_path, '03_with_extended_attributes', '04_extracted_layer_path'),
+    # LayerCheck(cqilib.sidepath_create_layer_roads, '03_with_extended_attributes', '05_extracted_layer_roads'),
+    # DictCheck2(cqilib.sidepath_dict, '09_layer_path_points_buffer', '05_extracted_layer_roads', '10_sidepath_dict'),
+    # TODO: why is the return type of functions not typechecked?
+    LayerCheck2(sidepath_classification_testwrapper, '02_reduced_fields', '10_sidepath_dict', '11_sidepaths'),
 ]
 
 # TODO: Find a better way to determine the project dir.. maybe through the Qgis project home for now

@@ -8,9 +8,11 @@ import os
 import time
 import importlib
 import json
+import traceback
 from dataclasses import dataclass  
 from collections.abc import Callable  
 from abc import ABC,abstractmethod  
+from pathlib import Path
 
 import cqilib
 importlib.reload(cqilib)
@@ -54,6 +56,10 @@ class TestProject:
 
     def run_checks(self, checks: list[Check] ):
         os.makedirs(self.out_dir(), exist_ok=True)
+        for f in os.listdir(self.out_dir()):
+            # TODO: improve cleanup
+            if f.endswith('.json') or f.endswith('geojson'):
+                os.remove(Path(self.out_dir()) / f)
     
         failed_count = 0
         # TODO: print runtime of tests
@@ -69,6 +75,7 @@ class TestProject:
                     print_run_result(start, 'OK')
             except Exception as e:
                 print_run_result(start, f'ERROR: {e.__class__} {e}')
+                traceback.print_exc()
                 failed_count += 1
 
 
