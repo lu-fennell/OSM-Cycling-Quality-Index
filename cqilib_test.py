@@ -18,7 +18,7 @@ def sidepath_classification_testwrapper(layer: QgsVectorLayer, sidepath_dict: di
     layer = cqilib.add_cyling_attributes(layer, p.attributes_list)
     prj = cqi_testlib.TestProject(project_dir)
     sidepath_dict = cqilib.sidepath_dict(prj.read_input_layer('09_layer_path_points_buffer'), prj.read_input_layer('05_extracted_layer_roads'))
-    cqilib.sidepath_classification(layer, sidepath_dict, cqilib.sidepath_classification_attrs(layer))
+    cqilib.sidepath_classification(layer, sidepath_dict, cqilib.attribute_ids(layer))
     return layer
 
 checks = [
