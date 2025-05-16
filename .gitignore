@@ -1,3 +1,4 @@
 /__pycache__/
 /traceoutput/
 /testoutput/
+/data/*.geojson
