@@ -31,6 +31,7 @@ import cqilib  # noqa: E402
 import parameter as p  # noqa: E402
 import definitions as d  # noqa: E402
 import reload_local_modules
+import featuredb_qgis
 
 
 # --------------------------------
@@ -48,6 +49,7 @@ reload_local_modules.reload(project_dir)
 dir_input = project_dir + "/data/way_import"
 dir_output = project_dir + "/data/cycling_quality_index"
 file_format = ".geojson"
+input_file = f'{dir_input}{file_format}'
 multi_input = False  # if "True", it's possible to merge different import files stored in the input directory, marked with an ascending number starting with 1 at the end of the filename (e.g. way_import1.geojson, way_import2.geojson etc.) - can be used to process different areas at the same time or to process a larger area that can't be downloaded in one file
 
 if project_dir not in sys.path:
@@ -63,18 +65,22 @@ print(time.strftime("%H:%M:%S", time.localtime()), "Start processing:")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Read data...")
 
-layer_way_input = cqilib.read_input(dir_input, file_format, p.attributes_list, multi_input)
-trace.add_layer(layer_way_input, "input")
+feature_db = featuredb_qgis.QgsFeatureDb(QgsProject.instance())
+
+# layer_way_input = cqilib.read_input(dir_input, file_format, p.attributes_list, multi_input)
+feature_set = feature_db.import_geojson(input_file, p.attributes_list)
+trace.add_layer(feature_set.to_layer(), "input")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Reproject and prepare data...")
 
-layer = cqilib.fixup_input_layer(layer_way_input, p.crs_metric, p.attributes_list)
-trace.add_layer(layer, "reduced_fields")
+cqilib.fixup_input_layer(feature_set, p.crs_metric, set(p.attributes_list))
+trace.add_layer(feature_set.to_layer(), "reduced_fields")
 
-layer = cqilib.add_cyling_attributes(layer, p.attributes_list)
-trace.add_layer(layer, "with_extended_attributes")
 
-QgsProject.instance().addMapLayer(layer, False)
+cqilib.add_cyling_attributes(feature_set, p.attributes_list)
+trace.add_layer(feature_set.to_layer(), "with_extended_attributes")
+
+layer = feature_set.to_layer()
 
 # ---------------------------------------------------------------#
 # 1: Check paths whether they are sidepath (a path along a road) #
@@ -208,6 +214,10 @@ iface.mapCanvas().setExtent(layer.extent())
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Finished processing.")
 print(time.strftime("%H:%M:%S", time.localtime()), "Check for regressions")
+
+# TODO: add "ResourceManager" and with(...)
+feature_db.close()
+
 import compare_traces  # noqa: E402
 
 # TODO: disable colorize

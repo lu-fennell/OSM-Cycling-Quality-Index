@@ -22,6 +22,7 @@ import math
 import time
 from pathlib import Path
 from dataclasses import dataclass
+from featuredb import FeatureSet, TagType
 
 import definitions as d
 
@@ -35,6 +36,7 @@ def read_layer_geojson(geojson_file: str, name: str | None = None) -> QgsVectorL
         return QgsVectorLayer(geojson_file, "ogr")
 
 
+# TODO: remove
 def copy_to_mem_layer(layer: QgsVectorLayer) -> QgsVectorLayer:
     return process_to_mem_layer(
         "qgis:extractbyexpression",
@@ -42,6 +44,7 @@ def copy_to_mem_layer(layer: QgsVectorLayer) -> QgsVectorLayer:
     )
 
 
+# TODO: remove
 def process_to_mem_layer(name: str, opts: dict) -> QgsVectorLayer:
     opts = opts.copy()
     opts["OUTPUT"] = "memory:"
@@ -113,23 +116,9 @@ def read_input(dir_input: str, file_format: str, attributes_list: list[str], mul
         )
 
 
-def fixup_input_layer(layer_way_input: QgsVectorLayer, crs_metric: str, attributes_list: list[str]) -> QgsVectorLayer:
-    
-    layer = processing.run(
-        "native:reprojectlayer",
-        {
-            "INPUT": layer_way_input,
-            "TARGET_CRS": QgsCoordinateReferenceSystem(crs_metric),
-            "OUTPUT": "memory:",
-        },
-    )["OUTPUT"]
-
-    # delete unneeded attributes
-    layer = processing.run(
-        "native:retainfields",
-        {"INPUT": layer, "FIELDS": attributes_list, "OUTPUT": "memory:"},
-    )["OUTPUT"]
-    return layer
+def fixup_input_layer(way_input: FeatureSet, crs_metric: str, attributes_list: set[str]):
+    way_input.reproject(crs_metric)
+    way_input.retaintags(attributes_list)
 
 new_attributes_dict = {
         "way_type": "String",
@@ -187,6 +176,8 @@ new_attributes_dict = {
         "filter_usable": "Int",
         "filter_way_type": "String",
     }
+def tag_type(attr: str) -> TagType:
+    return TagType.parse(new_attributes_dict.get(attr, "String"))
 
 # TODO: clean this up
 def ensure_cycling_attribute_types(layer: QgsVectorLayer):
@@ -205,36 +196,19 @@ def ensure_cycling_attribute_types(layer: QgsVectorLayer):
     print('TODO', layer.fields().at(idx).typeName(), layer.fields().at(idx).type() == QVariant.Int)
      
 # TODO: don't use the in-out param "attributes_list"
-def add_cyling_attributes(layer: QgsVectorLayer, attributes_list: list[str]) -> QgsVectorLayer:
+def add_cyling_attributes(feature_set: FeatureSet, attributes_list: list[str]):
     # list of new attributes, important for calculating cycling quality index
     
     # TODO: this is a weird "in-out" parameter
     for attr in list(new_attributes_dict.keys()):
         attributes_list.append(attr)
 
+    tag_specs = { name: tag_type(name) for name in attributes_list }
+    feature_set.add_tag_specs(tag_specs)
+
     # make sure all attributes are existing in the table to prevent errors when asking for a missing one
-    with edit(layer):
-        for attr in attributes_list:
-            if layer.fields().indexOf(attr) == -1:
-                if attr in new_attributes_dict:
-                    if new_attributes_dict[attr] == "Double":
-                        layer.dataProvider().addAttributes(
-                            [QgsField(attr, QVariant.Double)]
-                        )
-                    elif new_attributes_dict[attr] == "Int":
-                        layer.dataProvider().addAttributes(
-                            [QgsField(attr, QVariant.Int)]
-                        )
-                    else:
-                        layer.dataProvider().addAttributes(
-                            [QgsField(attr, QVariant.String)]
-                        )
-                else:
-                    layer.dataProvider().addAttributes(
-                        [QgsField(attr, QVariant.String)]
-                    )
-        layer.updateFields()
-    return layer
+
+    # return layer
 
 
 # TODO: instead of "extract" could I work with "select"

@@ -71,6 +71,7 @@ def _fix_null(k):
         return k
 
 
+# TODO: remove?
 def write_layer(out_dir: str, trace_item_name: str, layer: QgsVectorLayer) -> str:
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "GeoJSON"
@@ -94,6 +95,7 @@ def _make_pretty(fname: str):
         json.dump(content, f, indent=2)
 
 
+# TODO: remove?
 # Stubs don't seem to allow to complete QgsVectorFileWriter.NoError
 def _error_string(e: int) -> str:
     error_map = {
