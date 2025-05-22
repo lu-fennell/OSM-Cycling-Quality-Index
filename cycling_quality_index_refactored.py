@@ -26,16 +26,24 @@ import os
 import sys
 import math
 import time
-import importlib
+import tracing  # noqa: E402
+import cqilib  # noqa: E402
+import parameter as p  # noqa: E402
+import definitions as d  # noqa: E402
+import reload_local_modules
 
 
-
-from console.console import _console  # type: ignore[import-not-found]
-
+# --------------------------------
+#      S c r i p t   S e t u p
+# --------------------------------
+  
 # TODO: Find a better way to determine the project dir.. maybe through the Qgis project home for now
+from console.console import _console  # type: ignore[import-not-found]
 project_dir = os.path.dirname(
     _console.console.tabEditorWidget.currentWidget()._editor_code_widget.filePath()
 )
+reload_local_modules.reload(project_dir)
+
 
 dir_input = project_dir + "/data/way_import"
 dir_output = project_dir + "/data/cycling_quality_index"
@@ -44,19 +52,6 @@ multi_input = False  # if "True", it's possible to merge different import files 
 
 if project_dir not in sys.path:
     sys.path.append(project_dir)
-
-import tracing  # noqa: E402
-
-importlib.reload(tracing)
-import cqilib  # noqa: E402
-
-importlib.reload(cqilib)
-import parameter as p  # noqa: E402
-
-importlib.reload(p)
-import definitions as d  # noqa: E402
-
-importlib.reload(d)
 
 trace = tracing.Trace(f"{project_dir}/traceoutput", "refactored", pretty=True)
 

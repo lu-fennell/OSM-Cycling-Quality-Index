@@ -799,8 +799,6 @@ def sidepath_derive_offset_attrs(offset_layers: OffsetLayerDict, attrs: Attribut
 
 # TODO: make a class out of that
 import parameter as p
-import importlib
-importlib.reload(p)
 
 def sidepath_set_offset_attributes(layer: QgsVectorLayer, feature: QgsFeature, attrs: AttributeIds):
 

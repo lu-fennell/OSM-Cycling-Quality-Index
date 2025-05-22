@@ -6,7 +6,6 @@ from qgis.core import (
 
 import os
 import time
-import importlib
 import json
 import traceback
 from dataclasses import dataclass  
@@ -15,11 +14,8 @@ from abc import ABC,abstractmethod
 from pathlib import Path
 
 import cqilib
-importlib.reload(cqilib)
 import tracing  
-importlib.reload(tracing)
 import compare_traces  
-importlib.reload(compare_traces)
 
 
 class Check(ABC):
