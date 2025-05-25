@@ -221,22 +221,16 @@ else:
     print(time.strftime('%H:%M:%S', time.localtime()), '   Create way layers...')
     #create path layer: check all path, footways or cycleways for their sidepath status
     layer_path = processing.run('qgis:extractbyexpression', { 'INPUT' : layer, 'EXPRESSION' : '"highway" IS \'cycleway\' OR "highway" IS \'footway\' OR "highway" IS \'path\' OR "highway" IS \'bridleway\' OR "highway" IS \'steps\'', 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path, 'extracted_layer_path')
     #create road layer: extract all other highway types (except tracks)
     layer_roads = processing.run('qgis:extractbyexpression', { 'INPUT' : layer, 'EXPRESSION' : '"highway" IS NOT \'cycleway\' AND "highway" IS NOT \'footway\' AND "highway" IS NOT \'path\' AND "highway" IS NOT \'bridleway\' AND "highway" IS NOT \'steps\' AND "highway" IS NOT \'track\'', 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_roads, 'extracted_layer_roads')
 
     print(time.strftime('%H:%M:%S', time.localtime()), '   Create check points...')
     #create "check points" along each segment (to check for near/parallel highways at every checkpoint)
     layer_path_points = processing.run('native:pointsalonglines', {'INPUT' : layer_path, 'DISTANCE' : p.sidepath_buffer_distance, 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points, 'layer_path_points_pointsalonglines')
     layer_path_points_endpoints = processing.run('native:extractspecificvertices', { 'INPUT' : layer_path, 'VERTICES' : '-1', 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points_endpoints, 'layer_path_points_endpoints')
     layer_path_points = processing.run('native:mergevectorlayers', { 'LAYERS' : [layer_path_points, layer_path_points_endpoints], 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points, "layer_path_points_merged_with_endpoints")
     #create "check buffers" (to check for near/parallel highways with in the given distance)
     layer_path_points_buffers = processing.run('native:buffer', { 'INPUT' : layer_path_points, 'DISTANCE' : p.sidepath_buffer_size, 'OUTPUT': 'memory:'})['OUTPUT']
-    trace.add_layer(layer_path_points_buffers, 'layer_path_points_buffer')
     QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
 
     print(time.strftime('%H:%M:%S', time.localtime()), '   Check for adjacent roads...')

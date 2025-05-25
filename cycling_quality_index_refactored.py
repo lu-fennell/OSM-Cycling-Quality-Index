@@ -92,21 +92,15 @@ print(time.strftime("%H:%M:%S", time.localtime()), "   Create way layers...")
 # create path layer: check all path, footways or cycleways for their sidepath status
 #
 layer_path = cqilib.sidepath_create_layer_path(layer)
-trace.add_layer(layer_path, "extracted_layer_path")
 layer_roads = cqilib.sidepath_create_layer_roads(layer)
-trace.add_layer(layer_roads, "extracted_layer_roads")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "   Create check points...")
 # create "check points" along each segment (to check for near/parallel highways at every checkpoint)
 layer_path_points = cqilib.sidepath_pointsalonglines(layer_path, p.sidepath_buffer_distance)
-trace.add_layer(layer_path_points, "layer_path_points_pointsalonglines")
 layer_path_points_endpoints = cqilib.sidepath_extractlastvertex(layer_path)
-trace.add_layer(layer_path_points_endpoints, "layer_path_points_endpoints")
 layer_path_points = cqilib.merge_layers([layer_path_points, layer_path_points_endpoints])
-trace.add_layer(layer_path_points, "layer_path_points_merged_with_endpoints")
 # create "check buffers" (to check for near/parallel highways with in the given distance)
 layer_path_points_buffers = cqilib.sidepath_buffer(layer_path_points, p.sidepath_buffer_size)
-trace.add_layer(layer_path_points_buffers, "layer_path_points_buffer")
 QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
 
 print(time.strftime("%H:%M:%S", time.localtime()), "   Check for adjacent roads...")
