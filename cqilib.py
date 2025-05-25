@@ -350,18 +350,16 @@ def sidepath_dict(
     for buffer in layer_path_points_buffers.getFeatures():
         buffer_id = buffer.attribute("id")
         buffer_layer = buffer.attribute("layer")
-        if buffer_id not in sidepath_dict:
-            sidepath_dict[buffer_id] = {}
-            sidepath_dict[buffer_id]["checks"] = 1
-            sidepath_dict[buffer_id]["id"] = {}
-            sidepath_dict[buffer_id]["highway"] = {}
-            sidepath_dict[buffer_id]["name"] = {}
-            sidepath_dict[buffer_id]["maxspeed"] = {}
-        else:
-            sidepath_dict[buffer_id]["checks"] += 1
+        buffer_dict = sidepath_dict.setdefault(buffer_id, {
+                                     'checks': 0,
+                                     'id': {},
+                                     'highway': {},
+                                     'name': {},
+                                     'maxspeed': {}
+                                 })
+        buffer_dict["checks"] += 1
         layer_path_points_buffers.removeSelection()
         layer_path_points_buffers.select(buffer.id())
-        # TODO: can I have this without adding the layer to the project?
         feature_source = QgsProcessingFeatureSourceDefinition(
             layer_path_points_buffers.id(), selectedFeaturesOnly=True
         )
@@ -375,10 +373,14 @@ def sidepath_dict(
             },
         )
 
-        id_list = []
-        highway_list = []
-        name_list = []
+        # TODO: these could be sets, but as we later on replace the names with the first occurence, we need to maintain the order to be equivalent to the original implementation
+        id_list : list[str] = list()
+        highway_list : list[str] = list()
+        name_list : list[str] = list()
         maxspeed_dict: dict[str, float] = {}
+        def _add_list(l: list[str], item: str):
+            if item not in l:
+                l.append(item)
         for road in layer_roads.selectedFeatures():
             road_layer = road.attribute("layer")
             # TODO: is this happening? How can this happen?
@@ -388,36 +390,24 @@ def sidepath_dict(
             road_highway = road.attribute("highway")
             road_name = road.attribute("name")
             road_maxspeed = d.getNumber(road.attribute("maxspeed"))
-            # TODO: these lists are sets
-            if road_id not in id_list:
-                id_list.append(road_id)
-            # TODO: these lists are sets
-            if road_highway not in highway_list:
-                highway_list.append(road_highway)
+            _add_list(id_list, road_id)
+            _add_list(highway_list, road_highway)
             # TODO: probably should be a method on a maxspeed_dict wrapper
             if (
                 road_highway not in maxspeed_dict
                 or maxspeed_dict[road_highway] < road_maxspeed
             ):
                 maxspeed_dict[road_highway] = road_maxspeed
-            # TODO: these lists are sets
-            if road_name not in name_list:
-                name_list.append(road_name)
+            _add_list(name_list, road_name)
         for road_id in id_list:
-            if road_id in sidepath_dict[buffer_id]["id"]:
-                sidepath_dict[buffer_id]["id"][road_id] += 1
-            else:
-                sidepath_dict[buffer_id]["id"][road_id] = 1
+            buffer_dict['id'].setdefault(road_id, 0)
+            buffer_dict['id'][road_id] += 1
         for road_highway in highway_list:
-            if road_highway in sidepath_dict[buffer_id]["highway"]:
-                sidepath_dict[buffer_id]["highway"][road_highway] += 1
-            else:
-                sidepath_dict[buffer_id]["highway"][road_highway] = 1
+            buffer_dict['highway'].setdefault(road_highway, 0)
+            buffer_dict['highway'][road_highway] += 1
         for road_name in name_list:
-            if road_name in sidepath_dict[buffer_id]["name"]:
-                sidepath_dict[buffer_id]["name"][road_name] += 1
-            else:
-                sidepath_dict[buffer_id]["name"][road_name] = 1
+            buffer_dict['name'].setdefault(road_name, 0)
+            buffer_dict['name'][road_name] += 1
 
         for highway in maxspeed_dict.keys():
             if (
@@ -604,6 +594,7 @@ def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: A
                     sidepath_dict[id]["name"],
                     key=lambda k: sidepath_dict[id]["name"][k],
                 )  # the most frequent name in the surrounding
+                # TODO: why are names of sidepaths replaced? This happens even if they exist...
                 if name:
                     layer.changeAttributeValue(
                         feature.id(), layer.fields().indexOf("name"), name
