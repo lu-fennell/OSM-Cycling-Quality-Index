@@ -109,6 +109,13 @@ class QgsFeatureSet(FeatureSet):
     def to_layer(self) -> QgsVectorLayer:
         return typing.cast(QgsVectorLayer, self.db.project.mapLayer(self._layer_id))
 
+    def copy_to_layer(self) -> QgsVectorLayer:
+        return self._copy_to_mem_layer()
+
+    def copy(self) -> 'QgsFeatureSet':
+        new_layer = self.copy_to_layer()
+        return QgsFeatureSet(self.db, self.db._add_layer(new_layer))
+
     # TODO: needed?
     def _copy_to_mem_layer(self) -> QgsVectorLayer:
         return _process_to_mem_layer(

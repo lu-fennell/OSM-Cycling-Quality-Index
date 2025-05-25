@@ -73,13 +73,17 @@ trace.add_layer(feature_set.to_layer(), "input")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Reproject and prepare data...")
 
-cqilib.fixup_input_layer(feature_set, p.crs_metric, set(p.attributes_list))
+feature_set.reproject(p.crs_metric)
+feature_set.retaintags(set(p.attributes_list))
+
 trace.add_layer(feature_set.to_layer(), "reduced_fields")
 
 
 cqilib.add_cyling_attributes(feature_set, p.attributes_list)
 trace.add_layer(feature_set.to_layer(), "with_extended_attributes")
 
+
+features_reprojected = feature_set.copy()
 layer = feature_set.to_layer()
 
 # ---------------------------------------------------------------#
@@ -91,8 +95,8 @@ print(time.strftime("%H:%M:%S", time.localtime()), "   Create way layers...")
 
 # create path layer: check all path, footways or cycleways for their sidepath status
 #
-layer_path = cqilib.sidepath_create_layer_path(layer)
-layer_roads = cqilib.sidepath_create_layer_roads(layer)
+layer_path = cqilib.sidepath_create_layer_path(features_reprojected.to_layer())
+layer_roads = cqilib.sidepath_create_layer_roads(features_reprojected.to_layer())
 
 print(time.strftime("%H:%M:%S", time.localtime()), "   Create check points...")
 # create "check points" along each segment (to check for near/parallel highways at every checkpoint)
