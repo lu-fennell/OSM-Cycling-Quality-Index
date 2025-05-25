@@ -70,23 +70,26 @@ if __name__ == "__main__":
                 ORDER BY points.id;
             """).format(roads_table = psycopg.sql.Identifier(args.roads_table), paths_table = psycopg.sql.Identifier(args.paths_table))
 
-            current_buffer_id = None
-            current_sidepath_entry = SidepathEntry(0, {}, {}, {})
+            # current_buffer_id = None
+            # current_sidepath_entry = SidepathEntry(0, {}, {}, {})
             w = csv.writer(sys.stdout)
+            # TODO: does it actually stream?
             for r in cur.execute(query, { 'buffer_size': 10.0 }):
                 row = Row(**r)
-                if current_buffer_id != row.buffer_id:
-                    if current_buffer_id is not None:
-                        w.writerow([
-                          current_buffer_id,
-                          current_sidepath_entry.count,
-                          json.dumps(current_sidepath_entry.road_ids),
-                          json.dumps(current_sidepath_entry.highways),
-                          json.dumps(current_sidepath_entry.names)
-                        ])
-                    current_buffer_id = row.buffer_id
-                    current_sidepath_entry = SidepathEntry(0, {}, {}, {})
-                current_sidepath_entry.add_row(row)
+                # if current_buffer_id != row.buffer_id:
+                #     if current_buffer_id is not None:
+                #         w.writerow([
+                #           current_buffer_id,
+                #           current_sidepath_entry.count,
+                #           json.dumps(current_sidepath_entry.road_ids),
+                #           json.dumps(current_sidepath_entry.highways),
+                #           json.dumps(current_sidepath_entry.names)
+                #         ])
+                #     current_buffer_id = row.buffer_id
+                #     current_sidepath_entry = SidepathEntry(0, {}, {}, {})
+                # current_sidepath_entry.add_row(row)
+                w.writerow([row.buffer_id, row.road_id, row.road_highway, row.road_name])
+                
 
 
 
