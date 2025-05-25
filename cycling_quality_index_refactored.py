@@ -93,24 +93,12 @@ layer = feature_set.to_layer()
 print(time.strftime("%H:%M:%S", time.localtime()), "Sidepath check...")
 print(time.strftime("%H:%M:%S", time.localtime()), "   Create way layers...")
 
-# create path layer: check all path, footways or cycleways for their sidepath status
-#
-layer_path = cqilib.sidepath_create_layer_path(features_reprojected.to_layer())
-layer_roads = cqilib.sidepath_create_layer_roads(features_reprojected.to_layer())
 
-print(time.strftime("%H:%M:%S", time.localtime()), "   Create check points...")
-# create "check points" along each segment (to check for near/parallel highways at every checkpoint)
-layer_path_points = cqilib.sidepath_pointsalonglines(layer_path, p.sidepath_buffer_distance)
-layer_path_points_endpoints = cqilib.sidepath_extractlastvertex(layer_path)
-layer_path_points = cqilib.merge_layers([layer_path_points, layer_path_points_endpoints])
-# create "check buffers" (to check for near/parallel highways with in the given distance)
-layer_path_points_buffers = cqilib.sidepath_buffer(layer_path_points, p.sidepath_buffer_size)
-QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
 
-print(time.strftime("%H:%M:%S", time.localtime()), "   Check for adjacent roads...")
+print(time.strftime("%H:%M:%S", time.localtime()), "   Create check points and check for adjacent roads...")
 
 # for all check points: Save nearby road id's, names and highway classes in a dict
-sidepath_dict: dict = cqilib.sidepath_dict(layer_path_points_buffers, layer_roads)
+sidepath_dict: dict = cqilib.sidepath_dict(features_reprojected.to_layer())
 trace.add_dict(sidepath_dict, "sidepath_dict")
 
 attrs =  cqilib.attribute_ids(layer)

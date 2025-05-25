@@ -328,13 +328,23 @@ def sidepath_offset_layers(layer: QgsVectorLayer) -> OffsetLayerDict:
  
 # TODO: use a proper class for the entries of the dict
 def sidepath_dict(
-    layer_path_points_buffers: QgsVectorLayer, layer_roads: QgsVectorLayer
+    layer: QgsVectorLayer
 ) -> dict:
-    if QgsProject.instance().mapLayer(layer_path_points_buffers.id()) is None:
-        raise ValueError(
-            "argument layer_path_points_buffers is not part of the current project"
-        )
 
+    # create path layer: check all path, footways or cycleways for their sidepath status
+    #
+    layer_path = sidepath_create_layer_path(layer)
+    layer_roads = sidepath_create_layer_roads(layer)
+
+    # create "check points" along each segment (to check for near/parallel highways at every checkpoint)
+    layer_path_points = sidepath_pointsalonglines(layer_path, p.sidepath_buffer_distance)
+    layer_path_points_endpoints = sidepath_extractlastvertex(layer_path)
+    layer_path_points = merge_layers([layer_path_points, layer_path_points_endpoints])
+    # create "check buffers" (to check for near/parallel highways with in the given distance)
+    layer_path_points_buffers = sidepath_buffer(layer_path_points, p.sidepath_buffer_size)
+    QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
+
+    
     sidepath_dict: dict = {}
 
     for buffer in layer_path_points_buffers.getFeatures():
