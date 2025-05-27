@@ -1,0 +1,11 @@
+{
+  "tag": "highway",
+  "op": "in",
+  "value": [
+    "cycleway",
+    "footway",
+    "path",
+    "bridleway",
+    "steps"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "tag": "highway",
+  "op": "notin",
+  "value": [
+    "cycleway",
+    "footway",
+    "path",
+    "bridleway",
+    "steps",
+    "track"
+  ]
+}
