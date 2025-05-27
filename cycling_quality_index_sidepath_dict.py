@@ -43,10 +43,11 @@ class SidepathEntry:
 
     def add_row(self, r: Row):
         self.nrs.add(r.buffer_nr)
-        _add_entry(self.road_ids, r.road_id, r.buffer_nr )
-        _add_entry(self.highways, r.road_highway, r.buffer_nr)
-        _add_entry(self.names, r.road_name, r.buffer_nr)
-        _max_entry(self.maxspeed, r.road_highway, _speed_float(r.maxspeed))
+        if r.buffer_layer == r.road_layer:
+            _add_entry(self.road_ids, r.road_id, r.buffer_nr )
+            _add_entry(self.highways, r.road_highway, r.buffer_nr)
+            _add_entry(self.names, r.road_name, r.buffer_nr)
+            _max_entry(self.maxspeed, r.road_highway, _float_or_none(r.maxspeed))
 
     def result(self) -> SidepathEntryResult:
         return SidepathEntryResult(
@@ -56,6 +57,18 @@ class SidepathEntry:
             names=_histogram(self.names),
             maxspeed=self.maxspeed
         )
+
+def _add_entry(d: dict[str, set[int]], key: str, nr: int):
+    if key is not None:
+        d.setdefault(key, set()).add(nr)
+
+def _max_entry(d: dict[str, float], key: str, v: float | None):
+    if key is not None and v is not None:
+        d.setdefault(key, 0.0)
+        d[key] = max(v, d[key])
+
+def _histogram(d: dict[str, set[int]]) -> dict[str, int]:
+    return { k: len(v) for k, v in d.items() }
 
 class SidepathDictStream:
     def __enter__(self) -> 'SidepathDictStream':
@@ -95,21 +108,8 @@ def sidepath_dict_writer(stream: bool) -> SidepathDictObj | SidepathDictStream:
     else:
         return SidepathDictObj()
 
-def _inc_entry[K](d: dict[K, int], key: K):
-    if key is not None:
-        d.setdefault(key, 0)
-        d[key] += 1
 
-def _add_entry(d: dict[str, set[int]], key: str, nr: int):
-    if key is not None:
-        d.setdefault(key, set()).add(nr)
-
-def _histogram(d: dict[str, set[int]]) -> dict[str, int]:
-    return { k: len(v) for k, v in d.items() }
-
-
-
-def _speed_float(s: str) -> float | None:
+def _float_or_none(s: str | None) -> float | None:
     if s is None:
         return None
     try:
@@ -117,10 +117,6 @@ def _speed_float(s: str) -> float | None:
     except ValueError:
         return None
 
-def _max_entry(d: dict[str, float], key: str, v: float | None):
-    if key is not None and v is not None:
-        d.setdefault(key, 0.0)
-        d[key] = max(v, d[key])
 
 
 if __name__ == "__main__":
@@ -179,8 +175,6 @@ if __name__ == "__main__":
             with sidepath_dict_writer(stream = args.format == 'jsonl') as writer:
                 for r in cur.execute(query, { 'buffer_size': 22.0, 'buffer_distance': 100.0 }):
                     row = Row(**r)
-                    if row.buffer_layer != row.road_layer:
-                        continue
                     if current_buffer_id != row.buffer_id:
                         if current_buffer_id is not None:
                             writer.write_entry(current_buffer_id, current_sidepath_entry.result())

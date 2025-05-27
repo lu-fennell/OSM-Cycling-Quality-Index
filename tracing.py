@@ -57,11 +57,11 @@ def _fix_value(v):
 
 
 def _fix_dict(d: dict) -> dict:
-    return {(_fix_null(k)): _fix_value(v) for (k, v) in d.items()}
+    return {k: _fix_value(v) for (k, v) in d.items() if not _is_null_or_none(k) and not _is_null_or_none(v) }
 
 
 def _fix_list(d: list) -> list:
-    return [_fix_value(v) for v in d]
+    return [_fix_value(v) for v in d if not _is_null_or_none(v)]
 
 
 def _fix_null(k):
@@ -70,6 +70,8 @@ def _fix_null(k):
     else:
         return k
 
+def _is_null_or_none(k) -> bool:
+    return k is None or (isinstance(k, QVariant) and k.isNull())
 
 # TODO: remove?
 def write_layer(out_dir: str, trace_item_name: str, layer: QgsVectorLayer) -> str:
