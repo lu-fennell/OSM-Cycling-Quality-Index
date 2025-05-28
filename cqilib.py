@@ -27,11 +27,14 @@ from featuredb import FeatureSet, TagType
 import definitions as d
 
 
-def read_layer_geojson(geojson_file: str, name: str | None = None) -> QgsVectorLayer:
+def read_layer_geojson(geojson_file: str, name: str | None = None, filter : str | None = None) -> QgsVectorLayer:
     if not Path(geojson_file).exists():
         raise FileNotFoundError(geojson_file)
     if name is not None:
-        return QgsVectorLayer(geojson_file, name, "ogr")
+        filtered_file_name =geojson_file
+        if filter is not None:
+            filtered_file_name += f'|{filter}'
+        return QgsVectorLayer(filtered_file_name, name, "ogr")
     else:
         return QgsVectorLayer(geojson_file, "ogr")
 

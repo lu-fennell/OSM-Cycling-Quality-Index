@@ -118,21 +118,34 @@ def compare_json(f1: str, f2: str) -> list[str]:
         v2 = json2[key]
         if v1 != v2:
             errors.append(f'difference at common key {key}')
-            if type(v1) == dict and type(v2) == dict:
-                compare_dicts(errors, v1, v2)
+            if _is_sidepath_dict(v1) and _is_sidepath_dict(v2):
+                errors += compare_sidepath_dicts(key, v1, v2)
             else:
                 errors.append(f'  {json.dumps(v1)}')
                 errors.append(f'  {json.dumps(v2)}')
     return errors
 
-def compare_dicts(errors: list[str], d1: dict, d2:dict):
+def _is_sidepath_dict(v) -> bool:
+    sidepath_keys = { 'checks', 'id', 'highway', 'name', 'maxspeed' }
+    if isinstance(v, dict):
+        return 'checks' in v and v.keys() == sidepath_keys
+    else:
+        return False
+
+def compare_sidepath_dicts(common_key: str, d1: dict, d2:dict) -> list[str]:
+    errors: list[str] = [] 
     if d1 != d2:
-        diffs = [ (v1, d2.get(k)) for k, v1 in d1.items() if d2.get(k) != v1]
-        diffs += [ (d1.get(k), v2) for k, v2 in d2.items() if d1.get(k) != v2]
-        for v1, v2 in diffs:
-            errors.append(f'  {display_sorted(v1)}')
-            errors.append(f'  {display_sorted(v2)}')
-            errors.append('')
+        diffs = { k: (v1, d2.get(k)) for k, v1 in d1.items() if d2.get(k) != v1}
+        for k, (v1, v2) in diffs.items():
+            errors.append(f'  {k}:')
+            errors.append(f'    {display_sorted(v1)}')
+            errors.append(f'    {display_sorted(v2)}')
+            if k == 'id':
+                errors.append('  {"%s":' % common_key)
+                errors.append('       "v1": %s",' % json.dumps(v1))
+                errors.append('       "v2": %s"' % json.dumps(v2))
+                errors.append('   }')
+    return errors
 
 def display_sorted(v) -> str:
     if isinstance(v, dict):
