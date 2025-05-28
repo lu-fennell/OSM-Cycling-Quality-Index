@@ -114,9 +114,31 @@ def compare_json(f1: str, f2: str) -> list[str]:
 
     common_keys = keys1.intersection(keys2)
     for key in common_keys:
-        if json1[key] != json2[key]:
+        v1 = json1[key]
+        v2 = json2[key]
+        if v1 != v2:
             errors.append(f'difference at common key {key}')
+            if type(v1) == dict and type(v2) == dict:
+                compare_dicts(errors, v1, v2)
+            else:
+                errors.append(f'  {json.dumps(v1)}')
+                errors.append(f'  {json.dumps(v2)}')
     return errors
+
+def compare_dicts(errors: list[str], d1: dict, d2:dict):
+    if d1 != d2:
+        diffs = [ (v1, d2.get(k)) for k, v1 in d1.items() if d2.get(k) != v1]
+        diffs += [ (d1.get(k), v2) for k, v2 in d2.items() if d1.get(k) != v2]
+        for v1, v2 in diffs:
+            errors.append(f'  {display_sorted(v1)}')
+            errors.append(f'  {display_sorted(v2)}')
+            errors.append('')
+
+def display_sorted(v) -> str:
+    if isinstance(v, dict):
+        return str(sorted(v.items()))
+    else:
+        return str(v)
 
 def compare_files(f1: str, f2: str) -> list[str]:
     match (input_file_type(f1), input_file_type(f2)):
