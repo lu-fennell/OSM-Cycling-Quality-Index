@@ -13,9 +13,9 @@ from collections.abc import Callable
 from abc import ABC,abstractmethod  
 from pathlib import Path
 
-import cqilib
-import tracing  
-import compare_traces  
+import cqi.lib as cqilib
+import cqi.tracing as tracing
+import tools.compare_traces as compare_traces
 
 
 class Check(ABC):

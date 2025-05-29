@@ -1,5 +1,6 @@
 import importlib
 import sys
+import os.path
 
 def reload(project_dir: str):
     _reload_self()

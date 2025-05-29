@@ -22,7 +22,7 @@ import math
 import time
 from pathlib import Path
 from dataclasses import dataclass
-from featuredb import FeatureSet, TagType
+from cqi.featuredb import FeatureSet, TagType
 
 import definitions as d
 
@@ -188,15 +188,11 @@ def ensure_cycling_attribute_types(layer: QgsVectorLayer):
         fields = layer.dataProvider().fields()
         for attr, ty in new_attributes_dict.items():
             attr_idx = fields.indexOf(attr)
-            print('TODO', attr_idx)
             if ty == "Double":
                 fields.at(attr_idx).setType(QVariant.Double)
             elif ty == "Int":
-                print('TODO', attr)
                 fields.at(attr_idx).setType(QVariant.Int)
         layer.updateFields()
-    idx = layer.fields().indexOf('proc_maxspeed')
-    print('TODO', layer.fields().at(idx).typeName(), layer.fields().at(idx).type() == QVariant.Int)
      
 # TODO: don't use the in-out param "attributes_list"
 def add_cyling_attributes(feature_set: FeatureSet, attributes_list: list[str]):

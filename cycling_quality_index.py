@@ -23,13 +23,11 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 import parameter as p
-importlib.reload(p)
-
 import definitions as d
-importlib.reload(d)
+import reload_local_modules
+import cqi.tracing as tracing
 
-import tracing
-importlib.reload(tracing)
+reload_local_modules.reload(project_dir)
 
 trace = tracing.Trace(f'{project_dir}/traceoutput', 'original', pretty = True)
 

@@ -9,7 +9,7 @@ from typing import TextIO, Tuple
 
 # TODO: this should be a parameter or cmd line argument
 #
-sidepath_diff_output_file = 'sidepath_dict_diffs.json'
+sidepath_diff_output_file = 'tmp/sidepath_dict_diffs.json'
 
 class Color(Enum):
     GREEN = '\033[92m'
@@ -130,8 +130,13 @@ def compare_json(f1: str, f2: str) -> list[str]:
             else:
                 errors.append(f'  {json.dumps(v1)}')
                 errors.append(f'  {json.dumps(v2)}')
-    with open(sidepath_diff_output_file, "w") as f:
-        json.dump(diff_output, f, indent=2)
+    # TODO: would be much better to pass the file as an argument
+    #    or rather defer displaying of errors and have multiple output formats (text, json-file, etc)
+    try: 
+        with open(sidepath_diff_output_file, "w") as f:
+            json.dump(diff_output, f, indent=2)
+    except FileNotFoundError as e:
+        print(f"WARNING: could not write sidepath_diff_output: {e}")
     return errors
 
 def _is_sidepath_dict(v) -> bool:

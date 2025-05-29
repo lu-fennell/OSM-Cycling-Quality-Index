@@ -14,8 +14,7 @@ from qgis.core import (
 )
 from PyQt5.QtCore import QVariant
 import qgis.processing as processing
-from featuredb import FeatureDb, FeatureSet, TagType
-
+from cqi.featuredb import FeatureDb, FeatureSet, TagType
 
 class QgsFeatureDb(FeatureDb):
     def __init__(self, project: QgsProject):
@@ -32,6 +31,11 @@ class QgsFeatureDb(FeatureDb):
             )
 
             return QgsFeatureSet(self, layer_id)
+
+    def import_layer(self, layer:QgsVectorLayer) -> "QgsFeatureSet":
+        layer_id = self._add_layer(layer)
+        return QgsFeatureSet(self, layer_id)
+        
 
     def close(self):
         self.project.removeMapLayers(self._added_layers)
@@ -116,6 +120,8 @@ class QgsFeatureSet(FeatureSet):
         new_layer = self.copy_to_layer()
         return QgsFeatureSet(self.db, self.db._add_layer(new_layer))
 
+    
+
     # TODO: needed?
     def _copy_to_mem_layer(self) -> QgsVectorLayer:
         return _process_to_mem_layer(
@@ -146,10 +152,13 @@ def _process_to_mem_layer(name: str, opts: dict) -> QgsVectorLayer:
     return processing.run(name, opts)["OUTPUT"]
 
 def _qvariant_type(ty: TagType) -> QVariant.Type:
-    match ty:
-        case TagType.INT:
+    # TODO: somehow in QGIS modules are loaded twice.. and we cannot match on ty because there are two TagType classes :(
+    match str(ty):
+        case 'TagType.INT':
             return QVariant.Int
-        case TagType.DOUBLE:
+        case 'TagType.DOUBLE':
             return QVariant.Double
-        case TagType.STRING:
+        case 'TagType.STRING':
             return QVariant.String
+        case _:
+            raise ValueError(f'Unexpected: TagType not recognised: {ty}')

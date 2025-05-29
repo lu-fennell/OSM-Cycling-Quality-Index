@@ -26,12 +26,13 @@ import os
 import sys
 import math
 import time
-import tracing  # noqa: E402
-import cqilib  # noqa: E402
+import cqi.tracing as tracing # noqa: E402
+import cqi.lib as cqilib # noqa: E402
 import parameter as p  # noqa: E402
 import definitions as d  # noqa: E402
 import reload_local_modules
-import featuredb_qgis
+import cqi.featuredb_qgis as featuredb_qgis
+import tools.compare_traces  as compare_traces # noqa: E402
 
 
 # --------------------------------
@@ -204,7 +205,6 @@ print(time.strftime("%H:%M:%S", time.localtime()), "Check for regressions")
 # TODO: add "ResourceManager" and with(...)
 feature_db.close()
 
-import compare_traces  # noqa: E402
 
 # TODO: disable colorize
 compare_traces.run(trace.out_dir, f"{trace.tracing_dir}/original")

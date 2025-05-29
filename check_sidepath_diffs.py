@@ -10,7 +10,7 @@ from qgis.core import (
 )
 
 import reload_local_modules
-import cqilib
+import cqi.lib as cqilib
 import sys
 import os
 import json
@@ -36,13 +36,12 @@ def key(s: str) -> str:
 def val(s: str) -> str:
     return "'" + s + "'"
 
-
 prj =  QgsProject.instance()
 prj_dir = f'{prj.absolutePath()}/OSM-Cycling-Quality-Index/'
 
 reload_local_modules.reload(prj_dir)
 
-with open(f'{prj_dir}/sidepath_dict_diffs.json') as f:
+with open(f'{prj_dir}/tmp/sidepath_dict_diffs.json') as f:
     diffs = json.load(f)
     diff_indices = sorted(diffs.keys())
 

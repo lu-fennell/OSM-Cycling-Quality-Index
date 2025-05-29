@@ -1,10 +1,12 @@
 import psycopg
+from psycopg import Cursor
+import psycopg.sql as sql
 import argparse
 import json
 from dataclasses import dataclass
 from enum import Enum
 import sys
-import csv
+import os
 from typing import Tuple
 
 @dataclass
@@ -118,18 +120,8 @@ def _float_or_none(s: str | None) -> float | None:
         return None
 
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="calculate cqi on postgis")
-    parser.add_argument("roads_table", metavar="ROADS_TABLE_NAME")
-    parser.add_argument("paths_table", metavar="PATHS_TABLE_NAME")
-    parser.add_argument("--format", default='jsonl', required=False, choices=['jsonl', 'json'])
-    args = parser.parse_args()
-
-    roads_table = psycopg.sql.Identifier(args.roads_table)
-    paths_table = psycopg.sql.Identifier(args.paths_table)
-
-    with psycopg.connect("postgresql://postgres:postgres@127.0.0.1:5432/postgres") as conn:
+def generate_sidepath_dict(db_url: str, roads_table: str, paths_table: str, format: str):
+    with psycopg.connect(db_url) as conn:
         with conn.cursor(name = 'cqi_sidepath_dict', row_factory = psycopg.rows.dict_row) as cur:
             conn.execute("CREATE TEMPORARY SEQUENCE buffer_nr_sequence;")
             query = psycopg.sql.SQL("""
@@ -172,7 +164,7 @@ if __name__ == "__main__":
 
             current_buffer_id = None
             current_sidepath_entry = SidepathEntry()
-            with sidepath_dict_writer(stream = args.format == 'jsonl') as writer:
+            with sidepath_dict_writer(stream = format == 'jsonl') as writer:
                 for r in cur.execute(query, { 'buffer_size': 22.0, 'buffer_distance': 100.0 }):
                     row = Row(**r)
                     if current_buffer_id != row.buffer_id:
@@ -181,7 +173,149 @@ if __name__ == "__main__":
                         current_buffer_id = row.buffer_id
                         current_sidepath_entry = SidepathEntry()
                     current_sidepath_entry.add_row(row)
+
+
+class GeomType(Enum):
+    LINESTRING = 0
+    POLYGON = 1
+    OTHER = 3
+
+
+@dataclass
+class Feature:
+    id: str
+    properties: dict
+    geometry: dict
+
+    @staticmethod
+    def from_dict(d: dict) -> "Feature":
+        properties = d["properties"]
+        geometry = d["geometry"]
+        id = properties.get("id") or properties.get("@id")
+        return Feature(id, properties, geometry)
+
+    def geom_type(self) -> GeomType:
+        match self.geometry["type"]:
+            case "Polygon":
+                return GeomType.POLYGON
+            case "LineString":
+                return GeomType.LINESTRING
+            case _:
+                return GeomType.OTHER
+
+@dataclass
+class Filter:
+    tag: str
+    op: str
+    value: list[str]
+
+    def test(self, tags: dict) -> bool: 
+        match self.op:
+            case 'in':
+                return tags.get(self.tag) in self.value
+            case 'notin':
+                return tags.get(self.tag) not in self.value
+            case _:
+                raise ValueError(f'Operation "{self.op}" not supported')
+
+
+
+def read_json(fname: str) -> dict:
+    with open(fname) as f:
+        result = json.load(f)
+    return result
+
+
+def get_features(d: dict) -> list[Feature]:
+    return [Feature.from_dict(v) for v in d["features"]]
+
+def create_and_clear_table(cur: Cursor, table: sql.Identifier, srid: int):
+    cur.execute(sql.SQL("""
+            DROP TABLE IF EXISTS {table}""").format(table=table))
+    cur.execute(sql.SQL("""
+            CREATE TABLE {table} (
+                id text,
+                tags jsonb,
+                geom geometry(LINESTRING, {srid})
+            )""").format(table=table, srid=sql.Literal(srid)), )
+    cur.execute(sql.SQL("""
+            CREATE INDEX ON {table} USING btree (id);
+            CREATE INDEX ON {table} USING gist (geom);
+            """).format(table=table))
+ 
+def import_geojson(db_url: str, geojson_file: str, table_name: str, filter_file: str | None):
+    linestring_features = [f for f in get_features(read_json(geojson_file)) if f.geom_type() == GeomType.LINESTRING]
+
+    print(f"Found {len(linestring_features)} linestring features", file = sys.stderr)
+
+    table = sql.Identifier(table_name)
+    # TODO: should be a parameter
+    srid = 25833
+
+    filter = Filter(**read_json(filter_file)) if filter_file is not None else None
+
+    # TODO: report import progress
+    with psycopg.connect(db_url) as conn:
+        with conn.cursor() as cur:
+            create_and_clear_table(cur, table, srid)
+            for f in linestring_features:
+                if filter is None or filter.test(f.properties):
+                    id = f.id
+                    tags = { 'tags': f.properties }
+                    geom = f.geometry
+                    cur.execute(sql.SQL("""
+                          INSERT INTO {table}
+                          VALUES(
+                              %(id)s,
+                              %(tags)s,
+                              ST_Transform(
+                                  ST_GeomFromGeoJSON(%(geom)s),
+                                  %(srid)s
+                              )
+                          )
+                        """).format(table=table), { 'id': id, 'tags': json.dumps(tags), 'geom': json.dumps(geom), 'srid': srid})
+
+def get_db_url_from_env() -> str:
+    env_name = 'GEO_DATABASE_URL'
+    db_url = os.getenv(env_name)
+    if db_url is None:
+        print('ERROR: ', f"Please specify a postgres connection url in environment variable {env_name}")
+        sys.exit(-1)
+    return db_url
                 
+def run():
+    parser = argparse.ArgumentParser(description="postgis-related tools for cqi")
+    # TODO: optional args for DB connection
+
+    subparsers = parser.add_subparsers()
+
+    def run_import(url, args):
+        import_geojson(url, args.f, args.table_name, args.filter)
+
+    parser_import = subparsers.add_parser('import', description='import geojson file into postgis')
+    parser_import.add_argument("f", metavar="GEOJSON_FILE")
+    parser_import.add_argument("table_name", metavar="TABLE_NAME")
+    parser_import.add_argument("--filter", metavar="FILTER_JSON_FILE", required=False)
+    parser_import.set_defaults(run=run_import)
+
+    def run_generate(url, args):
+        roads_table = psycopg.sql.Identifier(args.roads_table)
+        paths_table = psycopg.sql.Identifier(args.paths_table)
+        generate_sidepath_dict(url, roads_table, paths_table, args.format)
+
+    parser_generate = subparsers.add_parser('generate-sidepath-dict', description="generate sidepath dict from roads and paths")
+    parser_generate.add_argument("roads_table", metavar="ROADS_TABLE_NAME")
+    parser_generate.add_argument("paths_table", metavar="PATHS_TABLE_NAME")
+    parser_generate.add_argument("--format", default='jsonl', required=False, choices=['jsonl', 'json'])
+    parser_generate.set_defaults(run=run_generate)
+
+    postgis_url = get_db_url_from_env()
+
+    args = parser.parse_args()
+    args.run(postgis_url, args)
+
+if __name__ == "__main__":
+    run()
 
 
 
