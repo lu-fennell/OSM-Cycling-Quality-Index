@@ -5,7 +5,11 @@ import os
 import math
 from enum import Enum
 from dataclasses import dataclass  # noqa: F401
+from typing import TextIO, Tuple
 
+# TODO: this should be a parameter or cmd line argument
+#
+sidepath_diff_output_file = 'sidepath_dict_diffs.json'
 
 class Color(Enum):
     GREEN = '\033[92m'
@@ -56,7 +60,6 @@ def feature_from_dict(d: dict) -> Feature:
     id = properties['id']
     return Feature(id, properties, geometry)
 
-# TODO: compare meta
 def get_features(d: dict) -> list[Feature]:
     return [feature_from_dict(v) for v in d['features']]
 
@@ -113,16 +116,22 @@ def compare_json(f1: str, f2: str) -> list[str]:
         errors.append(f'keys differ\n  only left: {only1}\n  only right: {only2}')
 
     common_keys = keys1.intersection(keys2)
+    diff_output : dict = {}
     for key in common_keys:
         v1 = json1[key]
         v2 = json2[key]
         if v1 != v2:
             errors.append(f'difference at common key {key}')
             if _is_sidepath_dict(v1) and _is_sidepath_dict(v2):
-                errors += compare_sidepath_dicts(key, v1, v2)
+                sidepath_dict_errors, d = compare_sidepath_dicts(v1, v2)
+                errors += sidepath_dict_errors
+                if d is not None:
+                    diff_output[key] = d
             else:
                 errors.append(f'  {json.dumps(v1)}')
                 errors.append(f'  {json.dumps(v2)}')
+    with open(sidepath_diff_output_file, "w") as f:
+        json.dump(diff_output, f, indent=2)
     return errors
 
 def _is_sidepath_dict(v) -> bool:
@@ -132,8 +141,9 @@ def _is_sidepath_dict(v) -> bool:
     else:
         return False
 
-def compare_sidepath_dicts(common_key: str, d1: dict, d2:dict) -> list[str]:
+def compare_sidepath_dicts(d1: dict, d2:dict) -> Tuple[list[str], dict | None]:
     errors: list[str] = [] 
+    id_diffs = None
     if d1 != d2:
         diffs = { k: (v1, d2.get(k)) for k, v1 in d1.items() if d2.get(k) != v1}
         for k, (v1, v2) in diffs.items():
@@ -141,11 +151,8 @@ def compare_sidepath_dicts(common_key: str, d1: dict, d2:dict) -> list[str]:
             errors.append(f'    {display_sorted(v1)}')
             errors.append(f'    {display_sorted(v2)}')
             if k == 'id':
-                errors.append('  {"%s":' % common_key)
-                errors.append('       "v1": %s",' % json.dumps(v1))
-                errors.append('       "v2": %s"' % json.dumps(v2))
-                errors.append('   }')
-    return errors
+                id_diffs = { 'v1': v1, 'v2': v2}
+    return (errors, id_diffs)
 
 def display_sorted(v) -> str:
     if isinstance(v, dict):

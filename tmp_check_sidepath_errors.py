@@ -16,19 +16,13 @@ import os
 import json
 from typing import Tuple
 
-diff = json.loads("""
-   {"way/1070140394": {
-        "v1": {"way/936928425": 1, "way/1218719809": 1, "way/1218719810": 1, "way/1313692353": 1, "way/1079762775": 1, "way/1313692335": 2, "way/548693222": 1, "way/1079762778": 1, "way/1218723794": 1},
-        "v2": {"way/1218719809": 1, "way/1313692353": 1, "way/936928425": 1, "way/1218719810": 1, "way/1313692335": 2, "way/1079762775": 1, "way/1079762778": 1, "way/1218723794": 1}
-        }
-    }
-""")
 
-def expressions(diff: dict) -> Tuple[str, str, str]:
-    id = next(diff.keys().__iter__())
-    v1 = roads_expression(diff[id]['v1'])
-    v2 = roads_expression(diff[id]['v2'])
-    return (id_expression(id), v1, v2)
+index = 0
+
+def expressions(path_id: str, diff: dict) -> Tuple[str, str, str]:
+    v1 = roads_expression(diff['v1'])
+    v2 = roads_expression(diff['v2'])
+    return (id_expression(path_id), v1, v2)
 
 def id_expression(id: str) -> str:
     return f'{key("id")} IS {val(id)}'
@@ -48,7 +42,10 @@ prj_dir = f'{prj.absolutePath()}/OSM-Cycling-Quality-Index/'
 
 reload_local_modules.reload(prj_dir)
 
-prj.removeAllMapLayers()
+with open(f'{prj_dir}/sidepath_dict_diffs.json') as f:
+    diffs = json.load(f)
+    diff_indices = sorted(diffs.keys())
+
 import_style_path = f'{prj_dir}/styles/import.qml'
 sidepath_style_path = f'{prj_dir}/styles/path.qml'
 original_style_path = f'{prj_dir}/styles/original.qml'
@@ -56,12 +53,9 @@ postgis_style_path = f'{prj_dir}/styles/postgis.qml'
 
 way_import_file = f'{prj_dir}/data/way_import.geojson'
 
-way_import = cqilib.read_layer_geojson(way_import_file, name='way_import', filter='geometrytype=LineString')
-way_import.loadNamedStyle(import_style_path)
-prj.addMapLayer(way_import, True)
 
 
-def load_layer(expression: str, name: str, style_path: str) -> QgsVectorLayer:
+def load_layer(way_import: QgsVectorLayer, expression: str, name: str, style_path: str) -> QgsVectorLayer:
     layer =  cqilib.process_to_mem_layer(
         "native:extractbyexpression",
         {"INPUT": way_import, "EXPRESSION": expression, "OUTPUT": "memory:"},
@@ -71,16 +65,32 @@ def load_layer(expression: str, name: str, style_path: str) -> QgsVectorLayer:
     prj.addMapLayer(layer, True)
     return layer
 
-# TODO: make sure 'postgis' and 'original' cannot be confused
-id_e, v1_e, v2_e = expressions(diff)
-load_layer(id_e, 'sidepath', sidepath_style_path)
+def run_next_diff():
+    global index
+    if index >= len(diff_indices):
+        print('NO MORE DIFFERENCES')
 
-postgis_layer = load_layer(v1_e, 'postgis', postgis_style_path)
-load_layer(v2_e, 'original', original_style_path)
+    prj.removeAllMapLayers()
+    # TODO: reproject as in cycling_quality_index
+    way_import = cqilib.read_layer_geojson(way_import_file, name='way_import', filter='geometrytype=LineString')
+    way_import.loadNamedStyle(import_style_path)
+    prj.addMapLayer(way_import, True)
 
-canvas = iface.mapCanvas()
-canvas.setExtent(postgis_layer.extent())
-canvas.refresh()
+    # TODO: make sure 'postgis' and 'original' cannot be confused
+    path_id = diff_indices[index]
+    diff = diffs[path_id]
+    id_e, v1_e, v2_e = expressions(path_id, diff)
+    load_layer(way_import, id_e, 'sidepath', sidepath_style_path)
+    postgis_layer = load_layer(way_import, v1_e, 'postgis', postgis_style_path)
+    load_layer(way_import, v2_e, 'original', original_style_path)
+
+    canvas = iface.mapCanvas()
+    canvas.setExtent(postgis_layer.extent())
+    canvas.refresh()
+    index += 1
+
+run_next_diff()
+
 
 
 
