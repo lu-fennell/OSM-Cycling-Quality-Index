@@ -8,28 +8,21 @@
 #   > version/date: 2024-04-15                                              #
 # ---------------------------------------------------------------------------#
 
-# TODO: how to import this s.t. mypy does not complain?
-from qgis.core import NULL, edit  # type: ignore[attr-defined]
+from qgis.core import edit  # type: ignore[attr-defined]
 from qgis.utils import iface  # type: ignore[import-not-found]
 from qgis.core import (
-    QgsVectorLayer,
-    QgsProcessingFeatureSourceDefinition,
-    QgsProperty,
     QgsProject,
     QgsCoordinateReferenceSystem,
     QgsVectorFileWriter,
-    QgsField,
 )
 from PyQt5.QtCore import QVariant
 import qgis.processing as processing
 import os
 import sys
-import math
 import time
 import cqi.tracing as tracing # noqa: E402
 import cqi.lib as cqilib # noqa: E402
 import parameter as p  # noqa: E402
-import definitions as d  # noqa: E402
 import reload_local_modules
 import cqi.featuredb_qgis as featuredb_qgis
 import tools.compare_traces  as compare_traces # noqa: E402
@@ -152,6 +145,7 @@ trace.add_layer(layer, "merged")
 print(time.strftime("%H:%M:%S", time.localtime()), "Determine way type...")
 cqilib.determine_way_type(layer, attrs)
 trace.add_layer(layer, "with_way_types")
+
 
 # ----------------------------------------------------#
 # 4: Derive relevant attributes for index and factors, and calculate index and factors #

@@ -6,7 +6,7 @@ file-types = ["py", "pyi", "py3", "pyw", "ptl", "rpy", "cpy", "ipy", "pyt", { gl
 shebangs = ["python", "uv"]
 roots = ["pyproject.toml", "setup.py", "poetry.lock", "pyrightconfig.json"]
 comment-token = "#"
-language-servers = ["roff", "pylsp"]
+language-servers = ["pyright"]
 # TODO: pyls needs utf-8 offsets
 indent = { tab-width = 4, unit = "    " }
 
@@ -14,3 +14,7 @@ indent = { tab-width = 4, unit = "    " }
 plugins.ruff.enabled = true
 plugins.black.enabled = true
 plugins.pylsp_mypy.enabled = true
+
+[language-server.pyright]
+command = "pyright-langserver"
+args = ["--stdio"]

@@ -1,4 +1,5 @@
 import psycopg
+import psycopg.rows as rows
 from psycopg import Cursor
 import psycopg.sql as sql
 import argparse
@@ -7,7 +8,6 @@ from dataclasses import dataclass
 from enum import Enum
 import sys
 import os
-from typing import Tuple
 
 @dataclass
 class Row:
@@ -120,11 +120,11 @@ def _float_or_none(s: str | None) -> float | None:
         return None
 
 
-def generate_sidepath_dict(db_url: str, roads_table: str, paths_table: str, format: str):
+def generate_sidepath_dict(db_url: str, roads_table: sql.Identifier, paths_table: sql.Identifier, format: str):
     with psycopg.connect(db_url) as conn:
-        with conn.cursor(name = 'cqi_sidepath_dict', row_factory = psycopg.rows.dict_row) as cur:
+        with conn.cursor(name = 'cqi_sidepath_dict', row_factory = rows.dict_row) as cur:
             conn.execute("CREATE TEMPORARY SEQUENCE buffer_nr_sequence;")
-            query = psycopg.sql.SQL("""
+            query = sql.SQL("""
                 WITH 
                 points AS (
                     SELECT id, nextval('buffer_nr_sequence') AS nr, tags -> 'tags' -> 'layer' as layer, (ST_Dump(
@@ -299,8 +299,8 @@ def run():
     parser_import.set_defaults(run=run_import)
 
     def run_generate(url, args):
-        roads_table = psycopg.sql.Identifier(args.roads_table)
-        paths_table = psycopg.sql.Identifier(args.paths_table)
+        roads_table = sql.Identifier(args.roads_table)
+        paths_table = sql.Identifier(args.paths_table)
         generate_sidepath_dict(url, roads_table, paths_table, args.format)
 
     parser_generate = subparsers.add_parser('generate-sidepath-dict', description="generate sidepath dict from roads and paths")
