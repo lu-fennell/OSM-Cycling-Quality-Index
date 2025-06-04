@@ -1,27 +1,21 @@
+# pyright: reportMissingModuleSource=false
+ 
 from qgis.core import NULL, edit  # type: ignore[attr-defined]
 
 
 from qgis.core import (
     QgsVectorLayer,
     QgsProcessingFeatureSourceDefinition,
-    QgsProcessingFeatureSource,
-    QgsVectorLayerSelectedFeatureSource,
     QgsProperty,
     QgsProject,
-    QgsCoordinateReferenceSystem,
-    QgsVectorFileWriter,
-    QgsField,
     QgsFeature,
 )
 from PyQt5.QtCore import QVariant
 import qgis.processing as processing
-import os
 from os.path import exists
-import sys
 import math
 import time
 from pathlib import Path
-from dataclasses import dataclass
 from cqi.featuredb import FeatureSet, TagType
 
 import definitions as d
@@ -812,7 +806,8 @@ def sidepath_set_offset_attributes(layer: QgsVectorLayer, feature: QgsFeature, a
             ):
                 # option 1: offset of sidepath lines according to real distances on the ground
                 if p.offset_distance == "realistic":
-                    offset_cycleway_left = width / 2
+                    # TODO: remove/fix pyright ignores
+                    offset_cycleway_left = width / 2 # pyright: ignore [reportPossiblyUnboundVariable]
                 # option 2: static offset as defined in the variable
                 else:
                     offset_cycleway_left = d.getNumber(p.offset_distance)
@@ -827,7 +822,7 @@ def sidepath_set_offset_attributes(layer: QgsVectorLayer, feature: QgsFeature, a
                 or cycleway_right in ["lane", "track", "share_busway"]
             ):
                 if p.offset_distance == "realistic":
-                    offset_cycleway_right = width / 2
+                    offset_cycleway_right = width / 2 # pyright: ignore [reportPossiblyUnboundVariable]
                 else:
                     offset_cycleway_right = d.getNumber(p.offset_distance)
                 layer.changeAttributeValue(
@@ -843,7 +838,7 @@ def sidepath_set_offset_attributes(layer: QgsVectorLayer, feature: QgsFeature, a
         ):
             if p.offset_distance == "realistic":
                 # use larger offset than for cycleways to get nearby, parallel lines in case both (cycleway and sidewalk) exist
-                offset_sidewalk_left = width / 2 + 2
+                offset_sidewalk_left = width / 2 + 2 # pyright: ignore [reportPossiblyUnboundVariable]
             else:
                 # TODO: double offset if cycleway exists on same side
                 offset_sidewalk_left = d.getNumber(p.offset_distance)
@@ -858,7 +853,7 @@ def sidepath_set_offset_attributes(layer: QgsVectorLayer, feature: QgsFeature, a
             or sidewalk_right_bicycle in ["yes", "designated", "permissive"]
         ):
             if p.offset_distance == "realistic":
-                offset_sidewalk_right = width / 2 + 2
+                offset_sidewalk_right = width / 2 + 2 # pyright: ignore [reportPossiblyUnboundVariable]
             else:
                 offset_sidewalk_right = d.getNumber(p.offset_distance)
             layer.changeAttributeValue(
@@ -1666,7 +1661,7 @@ def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
                             cycleway_left_buffer_right = 0
 
                         # carriageway width: use default road width if no width is specified
-                        if not width:
+                        if not width: # pyright: ignore [reportPossiblyUnboundVariable]
                             highway = feature.attribute("highway")
                             if highway in p.default_highway_width_dict:
                                 width = p.default_highway_width_dict[highway]
@@ -2198,6 +2193,7 @@ def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
                 else:
                     fac_width = 2 / (1 + 1.8 * math.e ** (-0.24 * calc_width))
 
+                # TODO: clean this up.. equivalent check to above
                 # on roads with restricted motor vehicle access, the width factor has a lower weight, because it can be assumed that there is less traffic that shares the road width
                 if (
                     way_type
@@ -2207,7 +2203,7 @@ def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
                         "shared traffic lane",
                         "track or service",
                     ]
-                    and motor_vehicle_access in p.motor_vehicle_access_index_dict
+                    and motor_vehicle_access in p.motor_vehicle_access_index_dict # pyright: ignore [reportPossiblyUnboundVariable]
                 ):
                     fac_width = fac_width + ((1 - fac_width) / 2)
 
@@ -2230,11 +2226,11 @@ def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
             elif proc_surface and proc_surface in p.surface_factor_dict:
                 fac_surface = p.surface_factor_dict[proc_surface]
 
-            layer.changeAttributeValue(feature.id(), attrs.id_fac_surface, fac_surface)
+            layer.changeAttributeValue(feature.id(), attrs.id_fac_surface, fac_surface) # pyright: ignore [reportPossiblyUnboundVariable]
 
-            if fac_surface > 1:
+            if fac_surface > 1:# pyright: ignore [reportPossiblyUnboundVariable]
                 data_bonus = d.addDelimitedValue(data_bonus, "excellent surface")
-            if fac_surface and fac_surface <= 0.5:
+            if fac_surface and fac_surface <= 0.5:# pyright: ignore [reportPossiblyUnboundVariable]
                 data_malus = d.addDelimitedValue(data_malus, "bad surface")
 
             # ------------------------------------------------
@@ -2270,7 +2266,7 @@ def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
             if base_index != NULL:
                 # factor 1: width and surface
                 # width and surface factors are weighted, so that low values have a stronger influence on the index
-                if fac_width and fac_surface:
+                if fac_width and fac_surface: # pyright: ignore [reportPossiblyUnboundVariable]
                     # fac_1 = (fac_width + fac_surface) / 2 #formula without weight factors
                     weight_factor_width = (
                         max(1 - fac_width, 0) + 0.5
@@ -2282,7 +2278,7 @@ def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
                     ) / (weight_factor_width + weight_factor_surface)
                 elif fac_width:
                     fac_1 = fac_width
-                elif fac_surface:
+                elif fac_surface: # pyright: ignore [reportPossiblyUnboundVariable]
                     fac_1 = fac_surface
                 else:
                     fac_1 = 1
