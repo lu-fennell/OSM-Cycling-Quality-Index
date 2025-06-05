@@ -1,18 +1,12 @@
+from cqi.util import unwrap
 from qgis.utils import iface  # type: ignore[import-not-found]
 from qgis.core import (
     QgsVectorLayer,
-    QgsProcessingFeatureSourceDefinition,
-    QgsProperty,
     QgsProject,
-    QgsCoordinateReferenceSystem,
-    QgsVectorFileWriter,
-    QgsField,
 )
 
 import reload_local_modules
 import cqi.lib as cqilib
-import sys
-import os
 import json
 from typing import Tuple
 
@@ -36,7 +30,7 @@ def key(s: str) -> str:
 def val(s: str) -> str:
     return "'" + s + "'"
 
-prj =  QgsProject.instance()
+prj =  unwrap(QgsProject.instance())
 prj_dir = f'{prj.absolutePath()}/OSM-Cycling-Quality-Index/'
 
 reload_local_modules.reload(prj_dir)
@@ -83,7 +77,7 @@ def run_next_diff():
     postgis_layer = load_layer(way_import, v1_e, 'postgis', postgis_style_path)
     load_layer(way_import, v2_e, 'original', original_style_path)
 
-    canvas = iface.mapCanvas()
+    canvas = iface.mapCanvas() # type: ignore
     canvas.setExtent(postgis_layer.extent())
     canvas.refresh()
     index += 1

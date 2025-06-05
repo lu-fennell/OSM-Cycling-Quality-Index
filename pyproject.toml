@@ -7,8 +7,17 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.13"
-qgis-stubs = "^0.2.0.post1"
 psycopg = "^3.2.9"
+
+[tool.pyright]
+
+# NOTE: if you want correct pyright hints, link or copy
+#  the modules "qgis" and "PyQt5" from your local installation into "../site-python" 
+#  (e.g. on Fedora 42 they are located in /usr/lib64/python3.13/site-packages)
+extraPaths = [ "../site-python" ]
+
+# the original cycling_quality_index script is not practical to type-check
+exclude = [ "./cycling_quality_index.py" ]
 
 
 [build-system]

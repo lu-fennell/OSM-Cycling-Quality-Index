@@ -1,6 +1,7 @@
 import os
 import json
 
+from cqi.util import unwrap
 from qgis.core import QgsProject, QgsVectorFileWriter, QgsVectorLayer
 from PyQt5.QtCore import QVariant
 
@@ -46,6 +47,13 @@ def write_dict(
         json.dump(d, f, indent=indent)
     return fname
 
+def _fix_key(k):
+    if isinstance(k, QVariant) and k.isNull():
+        return ''
+    else:
+        return _fix_value(k)
+
+
 
 def _fix_value(v):
     if isinstance(v, dict):
@@ -57,7 +65,7 @@ def _fix_value(v):
 
 
 def _fix_dict(d: dict) -> dict:
-    return {k: _fix_value(v) for (k, v) in d.items() if not _is_null_or_none(k) and not _is_null_or_none(v) }
+    return {_fix_key(k): _fix_value(v) for (k, v) in d.items() if k is not None and not _is_null_or_none(v) }
 
 
 def _fix_list(d: list) -> list:
@@ -78,14 +86,14 @@ def write_layer(out_dir: str, trace_item_name: str, layer: QgsVectorLayer) -> st
     options = QgsVectorFileWriter.SaveVectorOptions()
     options.driverName = "GeoJSON"
     options.fileEncoding = "utf8"
-    transform_context = QgsProject.instance().transformContext()
+    transform_context = unwrap(QgsProject.instance()).transformContext()
 
     fname = f"{out_dir}/{trace_item_name}"
     error = QgsVectorFileWriter.writeAsVectorFormatV3(
         layer, fname, transform_context, options
     )
 
-    if error[0] != QgsVectorFileWriter.NoError:
+    if error[0] != QgsVectorFileWriter.NoError: # type: ignore
         raise Exception(f"{_error_string(error[0])}: {error[1]}")
     return f"{fname}.geojson"
 
@@ -101,15 +109,15 @@ def _make_pretty(fname: str):
 # Stubs don't seem to allow to complete QgsVectorFileWriter.NoError
 def _error_string(e: int) -> str:
     error_map = {
-        QgsVectorFileWriter.NoError: "NoError",
-        QgsVectorFileWriter.ErrAttributeCreationFailed: "ErrAttributeCreationFailed",
-        QgsVectorFileWriter.ErrAttributeTypeUnsupported: "ErrAttributeTypeUnsupported",
-        QgsVectorFileWriter.ErrCreateDataSource: "ErrCreateDataSource",
-        QgsVectorFileWriter.ErrCreateLayer: "ErrCreateLayer",
-        QgsVectorFileWriter.ErrDriverNotFound: "ErrDriverNotFound",
-        QgsVectorFileWriter.ErrFeatureWriteFailed: "ErrFeatureWriteFailed",
-        QgsVectorFileWriter.ErrInvalidLayer: "ErrInvalidLayer",
-        QgsVectorFileWriter.ErrProjection: "ErrProjection",
-        QgsVectorFileWriter.ErrSavingMetadata: "ErrSavingMetadata",
+        QgsVectorFileWriter.NoError: "NoError", # type: ignore
+        QgsVectorFileWriter.ErrAttributeCreationFailed: "ErrAttributeCreationFailed", # type: ignore
+        QgsVectorFileWriter.ErrAttributeTypeUnsupported: "ErrAttributeTypeUnsupported", # type: ignore
+        QgsVectorFileWriter.ErrCreateDataSource: "ErrCreateDataSource", # type: ignore
+        QgsVectorFileWriter.ErrCreateLayer: "ErrCreateLayer", # type: ignore
+        QgsVectorFileWriter.ErrDriverNotFound: "ErrDriverNotFound", # type: ignore
+        QgsVectorFileWriter.ErrFeatureWriteFailed: "ErrFeatureWriteFailed", # type: ignore
+        QgsVectorFileWriter.ErrInvalidLayer: "ErrInvalidLayer", # type: ignore
+        QgsVectorFileWriter.ErrProjection: "ErrProjection", # type: ignore
+        QgsVectorFileWriter.ErrSavingMetadata: "ErrSavingMetadata", # type: ignore
     }
     return error_map[e] or f"Unknow error code: {e}"

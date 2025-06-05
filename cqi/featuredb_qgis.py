@@ -2,13 +2,12 @@ from os.path import exists
 import time
 import typing
 
-from qgis.core import NULL, edit  # type: ignore[attr-defined]
+from cqi.util import unwrap
+from qgis.core import NULL, QgsFeatureIterator, edit  # type: ignore[attr-defined]
 from qgis.core import (
     QgsVectorFileWriter,
     QgsProject,
-    QgsProcessingFeatureSourceDefinition,
     QgsVectorLayer,
-    QgsMapLayer,
     QgsCoordinateReferenceSystem,
     QgsField,
 )
@@ -16,12 +15,26 @@ from PyQt5.QtCore import QVariant
 import qgis.processing as processing
 from cqi.featuredb import FeatureDb, FeatureSet, TagType
 
+
+
+class QgsFeatureIterable:
+    def __init__(self, iter: QgsFeatureIterator):
+        self.iter = unwrap(iter.__iter__())
+
+    def __iter__(self):
+        return self.iter
+
+# TODO: document
+def iter_features(layer: QgsVectorLayer) -> QgsFeatureIterable:
+    return QgsFeatureIterable(layer.getFeatures())
+
 class QgsFeatureDb(FeatureDb):
     def __init__(self, project: QgsProject):
         self.project: QgsProject = project
         self._added_layers: set[str] = set()
 
-    def import_geojson(self, file: str, attributes_list: list[str]) -> "QgsFeatureSet":
+    # TODO: why are we not using attribute_list?
+    def import_geojson(self, file: str, attributes_list: typing.Optional[list[str]] = None) -> "QgsFeatureSet":
         if not exists(file):
             msg = f'{time.strftime("%H:%M:%S", time.localtime())} [!] Error: No valid input file at {file}"'
             raise FileNotFoundError(msg)
@@ -73,7 +86,7 @@ class QgsFeatureSet(FeatureSet):
             layer, fname, transform_context, options
         )
 
-        if error[0] != QgsVectorFileWriter.NoError:
+        if error[0] != QgsVectorFileWriter.NoError: # type: ignore
             raise Exception(f"{_error_string(error[0])}: {error[1]}")
         return f"{fname}.geojson"
 
@@ -86,11 +99,11 @@ class QgsFeatureSet(FeatureSet):
             },
         )
 
-    def add_tag_specs(self, tags_spec: dict[str, TagType]):
+    def add_tag_specs(self, tag_specs: dict[str, TagType]):
         layer = self.to_layer()
-        fields = [QgsField(attr, _qvariant_type(ty)) for attr, ty in tags_spec.items() if layer.fields().indexOf(attr) == -1]
+        fields = [QgsField(attr, _qvariant_type(ty)) for attr, ty in tag_specs.items() if layer.fields().indexOf(attr) == -1]
         with edit(layer):
-            layer.dataProvider().addAttributes(fields)
+            unwrap(layer.dataProvider()).addAttributes(fields)
             layer.updateFields()
 
     def retaintags(self, tags: set[str]):
@@ -132,16 +145,16 @@ class QgsFeatureSet(FeatureSet):
 
 def _error_string(e: int) -> str:
     error_map = {
-        QgsVectorFileWriter.NoError: "NoError",
-        QgsVectorFileWriter.ErrAttributeCreationFailed: "ErrAttributeCreationFailed",
-        QgsVectorFileWriter.ErrAttributeTypeUnsupported: "ErrAttributeTypeUnsupported",
-        QgsVectorFileWriter.ErrCreateDataSource: "ErrCreateDataSource",
-        QgsVectorFileWriter.ErrCreateLayer: "ErrCreateLayer",
-        QgsVectorFileWriter.ErrDriverNotFound: "ErrDriverNotFound",
-        QgsVectorFileWriter.ErrFeatureWriteFailed: "ErrFeatureWriteFailed",
-        QgsVectorFileWriter.ErrInvalidLayer: "ErrInvalidLayer",
-        QgsVectorFileWriter.ErrProjection: "ErrProjection",
-        QgsVectorFileWriter.ErrSavingMetadata: "ErrSavingMetadata",
+        QgsVectorFileWriter.NoError: "NoError", # type: ignore
+        QgsVectorFileWriter.ErrAttributeCreationFailed: "ErrAttributeCreationFailed", # type: ignore
+        QgsVectorFileWriter.ErrAttributeTypeUnsupported: "ErrAttributeTypeUnsupported", # type: ignore
+        QgsVectorFileWriter.ErrCreateDataSource: "ErrCreateDataSource", # type: ignore
+        QgsVectorFileWriter.ErrCreateLayer: "ErrCreateLayer", # type: ignore
+        QgsVectorFileWriter.ErrDriverNotFound: "ErrDriverNotFound", # type: ignore
+        QgsVectorFileWriter.ErrFeatureWriteFailed: "ErrFeatureWriteFailed", # type: ignore
+        QgsVectorFileWriter.ErrInvalidLayer: "ErrInvalidLayer", # type: ignore
+        QgsVectorFileWriter.ErrProjection: "ErrProjection", # type: ignore
+        QgsVectorFileWriter.ErrSavingMetadata: "ErrSavingMetadata", # type: ignore
     }
     return error_map[e] or f"Unknow error code: {e}"
 
@@ -149,7 +162,7 @@ def _error_string(e: int) -> str:
 def _process_to_mem_layer(name: str, opts: dict) -> QgsVectorLayer:
     opts = opts.copy()
     opts["OUTPUT"] = "memory:"
-    return processing.run(name, opts)["OUTPUT"]
+    return unwrap(processing.run(name, opts))["OUTPUT"]
 
 def _qvariant_type(ty: TagType) -> QVariant.Type:
     # TODO: somehow in QGIS modules are loaded twice.. and we cannot match on ty because there are two TagType classes :(

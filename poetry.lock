@@ -23,34 +23,6 @@ pool = ["psycopg-pool"]
 test = ["anyio (>=4.0)", "mypy (>=1.14)", "pproxy (>=2.7)", "pytest (>=6.2.5)", "pytest-cov (>=3.0)", "pytest-randomly (>=3.5)"]
 
 [[package]]
-name = "pyqt5-stubs"
-version = "5.15.6.0"
-description = "PEP561 stub files for the PyQt5 framework"
-optional = false
-python-versions = ">= 3.5"
-files = [
-    {file = "PyQt5-stubs-5.15.6.0.tar.gz", hash = "sha256:91270ac23ebf38a1dc04cd97aa852cd08af82dc839100e5395af1447e3e99707"},
-    {file = "PyQt5_stubs-5.15.6.0-py3-none-any.whl", hash = "sha256:7fb8177c72489a8911f021b7bd7c33f12c87f6dba92dcef3fdcdb5d9400f0f3f"},
-]
-
-[package.extras]
-dev = ["mypy (==0.930)", "pytest", "pytest-xvfb"]
-
-[[package]]
-name = "qgis-stubs"
-version = "0.2.0.post1"
-description = "PEP561 type stubs for PyQGIS"
-optional = false
-python-versions = ">= 3.6"
-files = [
-    {file = "qgis-stubs-0.2.0.post1.tar.gz", hash = "sha256:96b9e6cb2deda1ad327b81334515ef9d88f9e92344cbf179de554be7b62154c8"},
-    {file = "qgis_stubs-0.2.0.post1-py3-none-any.whl", hash = "sha256:77e258342eec6ed6d8088701d490d951be83680a99733fa27a50959a88bedfce"},
-]
-
-[package.dependencies]
-PyQt5-stubs = ">=5.14"
-
-[[package]]
 name = "tzdata"
 version = "2025.2"
 description = "Provider of IANA time zone data"
@@ -64,4 +36,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.13"
-content-hash = "1e5f146c037e5f748997605ea74fc4388e2caa1c56fee9ad1cdbe61f4edacf16"
+content-hash = "815691a130941fe2b8bb9e1861e0c8bae678a6a25a716a75b7161eb03e17b1dd"

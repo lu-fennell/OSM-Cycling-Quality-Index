@@ -190,7 +190,7 @@ highway_factor_dict_weights = {
 separation_level_dict = {
     'no': 0,
     'none': 0,
-    NULL: 0,
+    NULL: 0, # type: ignore
     'studs': 0.1,
     'yes': 0.3,
     'vertical_panel': 0.3,

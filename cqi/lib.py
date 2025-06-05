@@ -1,5 +1,7 @@
 # pyright: reportMissingModuleSource=false
  
+from typing import TypeVar, cast
+from cqi.util import unwrap
 from qgis.core import NULL, edit  # type: ignore[attr-defined]
 
 
@@ -18,7 +20,9 @@ import time
 from pathlib import Path
 from cqi.featuredb import FeatureSet, TagType
 
+from cqi.featuredb_qgis import QgsFeatureSet, iter_features
 import definitions as d
+from qgis.utils import Optional
 
 
 def read_layer_geojson(geojson_file: str, name: str | None = None, filter : str | None = None) -> QgsVectorLayer:
@@ -45,7 +49,7 @@ def copy_to_mem_layer(layer: QgsVectorLayer) -> QgsVectorLayer:
 def process_to_mem_layer(name: str, opts: dict) -> QgsVectorLayer:
     opts = opts.copy()
     opts["OUTPUT"] = "memory:"
-    return processing.run(name, opts)["OUTPUT"]
+    return unwrap(processing.run(name, opts))["OUTPUT"]
 
 def read_input(dir_input: str, file_format: str, attributes_list: list[str], multi_input :bool) -> QgsVectorLayer:
     
@@ -63,26 +67,26 @@ def read_input(dir_input: str, file_format: str, attributes_list: list[str], mul
                 "way input",
                 "ogr",
             )
-            layer_way_input = processing.run(
+            layer_way_input = unwrap(processing.run(
                 "native:retainfields",
                 {
                     "INPUT": layer_way_input,
                     "FIELDS": attributes_list,
                     "OUTPUT": "memory:",
                 },
-            )["OUTPUT"]
+            ))["OUTPUT"]
             input_data.append(layer_way_input)
             i += 1
         if input_data:
             print(time.strftime("%H:%M:%S", time.localtime()), "   Merge input files...")
             # TODO: wrap processing.run in a typed function
-            layer_way_input = processing.run(
+            layer_way_input = unwrap(processing.run(
                 "native:mergevectorlayers", {"LAYERS": input_data, "OUTPUT": "memory:"}
-            )["OUTPUT"]
-            layer_way_input = processing.run(
+            ))["OUTPUT"]
+            layer_way_input = unwrap(processing.run(
                 "native:deleteduplicategeometries",
                 {"INPUT": layer_way_input, "OUTPUT": dir_input + file_format},
-            )["OUTPUT"]
+            ))["OUTPUT"]
         else:
             print(
                 time.strftime("%H:%M:%S", time.localtime()),
@@ -179,7 +183,7 @@ def tag_type(attr: str) -> TagType:
 # TODO: clean this up
 def ensure_cycling_attribute_types(layer: QgsVectorLayer):
     with edit(layer):
-        fields = layer.dataProvider().fields()
+        fields = unwrap(layer.dataProvider()).fields()
         for attr, ty in new_attributes_dict.items():
             attr_idx = fields.indexOf(attr)
             if ty == "Double":
@@ -264,7 +268,7 @@ def sidepath_offset_layers(layer: QgsVectorLayer) -> OffsetLayerDict:
         "qgis:selectbyexpression",
         {"INPUT": layer, "EXPRESSION": '"offset_cycleway_left" IS NOT NULL'},
     )
-    offset_layers["left"]["cycleway"] = processing.run(
+    offset_layers["left"]["cycleway"] = unwrap(processing.run(
         "native:offsetline",
         {
             "INPUT": QgsProcessingFeatureSourceDefinition(
@@ -273,12 +277,12 @@ def sidepath_offset_layers(layer: QgsVectorLayer) -> OffsetLayerDict:
             "DISTANCE": QgsProperty.fromExpression('"offset_cycleway_left"'),
             "OUTPUT": "memory:",
         },
-    )["OUTPUT"]
+    ))["OUTPUT"]
     processing.run(
         "qgis:selectbyexpression",
         {"INPUT": layer, "EXPRESSION": '"offset_cycleway_right" IS NOT NULL'},
     )
-    offset_layers["right"]["cycleway"] = processing.run(
+    offset_layers["right"]["cycleway"] = unwrap(processing.run(
         "native:offsetline",
         {
             "INPUT": QgsProcessingFeatureSourceDefinition(
@@ -287,12 +291,12 @@ def sidepath_offset_layers(layer: QgsVectorLayer) -> OffsetLayerDict:
             "DISTANCE": QgsProperty.fromExpression('-"offset_cycleway_right"'),
             "OUTPUT": "memory:",
         },
-    )["OUTPUT"]
+    ))["OUTPUT"]
     processing.run(
         "qgis:selectbyexpression",
         {"INPUT": layer, "EXPRESSION": '"offset_sidewalk_left" IS NOT NULL'},
     )
-    offset_layers["left"]["sidewalk"] = processing.run(
+    offset_layers["left"]["sidewalk"] = unwrap(processing.run(
         "native:offsetline",
         {
             "INPUT": QgsProcessingFeatureSourceDefinition(
@@ -301,12 +305,12 @@ def sidepath_offset_layers(layer: QgsVectorLayer) -> OffsetLayerDict:
             "DISTANCE": QgsProperty.fromExpression('"offset_sidewalk_left"'),
             "OUTPUT": "memory:",
         },
-    )["OUTPUT"]
+    ))["OUTPUT"]
     processing.run(
         "qgis:selectbyexpression",
         {"INPUT": layer, "EXPRESSION": '"offset_sidewalk_right" IS NOT NULL'},
     )
-    offset_layers["right"]["sidewalk"] = processing.run(
+    offset_layers["right"]["sidewalk"] = unwrap(processing.run(
         "native:offsetline",
         {
             "INPUT": QgsProcessingFeatureSourceDefinition(
@@ -315,15 +319,17 @@ def sidepath_offset_layers(layer: QgsVectorLayer) -> OffsetLayerDict:
             "DISTANCE": QgsProperty.fromExpression('-"offset_sidewalk_right"'),
             "OUTPUT": "memory:",
         },
-    )["OUTPUT"]
+    ))["OUTPUT"]
     return offset_layers
 
  
 # TODO: use a proper class for the entries of the dict
 def sidepath_dict(
-    layer: QgsVectorLayer
+    features: FeatureSet
 ) -> dict:
 
+    # TODO: port to featuredb
+    layer = cast(QgsFeatureSet, features).to_layer()
     # create path layer: check all path, footways or cycleways for their sidepath status
     #
     layer_path = sidepath_create_layer_path(layer)
@@ -335,12 +341,12 @@ def sidepath_dict(
     layer_path_points = merge_layers([layer_path_points, layer_path_points_endpoints])
     # create "check buffers" (to check for near/parallel highways with in the given distance)
     layer_path_points_buffers = sidepath_buffer(layer_path_points, p.sidepath_buffer_size)
-    QgsProject.instance().addMapLayer(layer_path_points_buffers, False)
+    unwrap(QgsProject.instance()).addMapLayer(layer_path_points_buffers, False)
 
     
     sidepath_dict: dict = {}
 
-    for buffer in layer_path_points_buffers.getFeatures():
+    for buffer in iter_features(layer_path_points_buffers):
         buffer_id = buffer.attribute("id")
         buffer_layer = buffer.attribute("layer")
         buffer_dict = sidepath_dict.setdefault(buffer_id, {
@@ -476,7 +482,10 @@ class AttributeIds:
 def attribute_ids(layer:QgsVectorLayer) -> AttributeIds:
     return AttributeIds(layer)
 
-def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: AttributeIds):
+def sidepath_classification(features: FeatureSet, sidepath_dict: dict, attrs: AttributeIds):
+
+    # TODO: port to feature_set
+    layer = cast(QgsFeatureSet, features).to_layer()
     # TODO: why is this not in "definitions" or "parameters"
     highway_class_list = [
         "motorway",
@@ -500,7 +509,7 @@ def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: A
 
     # a path is considered a sidepath if at least two thirds of its check points are found to be close to road segments with the same OSM ID, highway class or street name
     with edit(layer):
-        for feature in layer.getFeatures():
+        for feature in iter_features(layer):
             hw = feature.attribute("highway")
             maxspeed = feature.attribute("maxspeed")
             # TODO: this is redundant
@@ -592,6 +601,7 @@ def sidepath_classification(layer: QgsVectorLayer, sidepath_dict: dict, attrs: A
                     layer.changeAttributeValue(
                         feature.id(), layer.fields().indexOf("name"), name
                     )
+        layer.updateFields()
 
 
 
@@ -601,7 +611,7 @@ def sidepath_derive_offset_attrs(offset_layers: OffsetLayerDict, attrs: Attribut
         for type in ["cycleway", "sidewalk"]:
             offset_layer = offset_layers[side][type]
             with edit(offset_layer):
-                for feature in offset_layer.getFeatures():
+                for feature in iter_features(offset_layer):
                     offset_layer.changeAttributeValue(
                         feature.id(),
                         attrs.id_offset,
@@ -862,7 +872,7 @@ def sidepath_set_offset_attributes(layer: QgsVectorLayer, feature: QgsFeature, a
 
 def determine_way_type(layer: QgsVectorLayer, attrs: AttributeIds):
     with edit(layer):
-        for feature in layer.getFeatures():
+        for feature in iter_features(layer):
             # exclude segments with no public bicycle access
             if d.getAccess(feature, "bicycle") and d.getAccess(
                 feature, "bicycle"
@@ -1199,7 +1209,7 @@ def determine_way_type(layer: QgsVectorLayer, attrs: AttributeIds):
 def calculate_index(layer:QgsVectorLayer, attrs: AttributeIds):
 
     with edit(layer):
-        for feature in layer.getFeatures():
+        for feature in iter_features(layer):
             way_type = feature.attribute("way_type")
             side = feature.attribute("side")
             is_sidepath = feature.attribute("proc_sidepath")

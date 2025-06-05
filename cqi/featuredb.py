@@ -1,5 +1,6 @@
 from abc import ABC,abstractmethod
 from enum import Enum
+from typing import Optional
 
 class TagType(Enum):
     INT = 0
@@ -50,7 +51,7 @@ class FeatureDb(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def import_geojson(self, file: str, attributes_list: list[str]) -> FeatureSet:
+    def import_geojson(self, file: str, attributes_list: Optional[list[str]] = None) -> FeatureSet:
         raise NotImplementedError
 
 

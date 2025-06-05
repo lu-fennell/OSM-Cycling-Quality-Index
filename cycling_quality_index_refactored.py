@@ -8,23 +8,26 @@
 #   > version/date: 2024-04-15                                              #
 # ---------------------------------------------------------------------------#
 
-from qgis.core import edit  # type: ignore[attr-defined]
+from collections.abc import Iterable
+from qgis.core import QgsFeature, QgsFeatureIterator, QgsVectorLayer, edit  # type: ignore[attr-defined]
 from qgis.utils import iface  # type: ignore[import-not-found]
 from qgis.core import (
     QgsProject,
     QgsCoordinateReferenceSystem,
     QgsVectorFileWriter,
 )
-from PyQt5.QtCore import QVariant
+from qgis.PyQt.QtCore import QVariant
 import qgis.processing as processing
 import os
 import sys
 import time
 import cqi.tracing as tracing # noqa: E402
 import cqi.lib as cqilib # noqa: E402
+from cqi.lib import unwrap
 import parameter as p  # noqa: E402
 import reload_local_modules
 import cqi.featuredb_qgis as featuredb_qgis
+from cqi.featuredb_qgis import iter_features
 import tools.compare_traces  as compare_traces # noqa: E402
 
 
@@ -50,16 +53,19 @@ if project_dir not in sys.path:
     sys.path.append(project_dir)
 
 trace = tracing.Trace(f"{project_dir}/traceoutput", "refactored", pretty=True)
-
+# 
+#
 # --------------------------------
 #      S c r i p t   S t a r t
 # --------------------------------
+#
+ 
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Start processing:")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Read data...")
 
-feature_db = featuredb_qgis.QgsFeatureDb(QgsProject.instance())
+feature_db = featuredb_qgis.QgsFeatureDb(unwrap(QgsProject.instance()))
 
 # layer_way_input = cqilib.read_input(dir_input, file_format, p.attributes_list, multi_input)
 feature_set = feature_db.import_geojson(input_file, p.attributes_list)
@@ -92,12 +98,12 @@ print(time.strftime("%H:%M:%S", time.localtime()), "   Create way layers...")
 print(time.strftime("%H:%M:%S", time.localtime()), "   Create check points and check for adjacent roads...")
 
 # for all check points: Save nearby road id's, names and highway classes in a dict
-sidepath_dict: dict = cqilib.sidepath_dict(features_reprojected.to_layer())
+sidepath_dict: dict = cqilib.sidepath_dict(features_reprojected)
 trace.add_dict(sidepath_dict, "sidepath_dict")
 
 attrs =  cqilib.attribute_ids(layer)
 cqilib.sidepath_classification(
-   layer,
+   feature_set,
    sidepath_dict,
     attrs       
 )
@@ -109,7 +115,7 @@ trace.add_layer(layer, "sidepaths")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Split line bundles...")
 with edit(layer):
-    for feature in layer.getFeatures():
+    for feature in iter_features(layer):
         cqilib.sidepath_set_offset_attributes(layer, feature, attrs)
 
     # TODO: offset als Attribut überschreiben
@@ -159,22 +165,22 @@ trace.add_layer(layer, "after_indexing")
 
 # clean up data set and reproject to output crs
 print(time.strftime("%H:%M:%S", time.localtime()), "Clean up data...")
-layer = processing.run(
+layer = unwrap(processing.run(
     "native:retainfields",
     {
         "INPUT": layer,
         "FIELDS": p.attributes_list_finally_retained,
         "OUTPUT": "memory:",
     },
-)["OUTPUT"]
-layer = processing.run(
+))["OUTPUT"]
+layer = unwrap(processing.run(
     "native:reprojectlayer",
     {
         "INPUT": layer,
         "TARGET_CRS": QgsCoordinateReferenceSystem(p.crs_output),
         "OUTPUT": "memory:",
     },
-)["OUTPUT"]
+))["OUTPUT"]
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Save output data set...")
 QgsVectorFileWriter.writeAsVectorFormat(
@@ -187,11 +193,11 @@ QgsVectorFileWriter.writeAsVectorFormat(
 trace.add_layer(layer, "final_result")
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Display data...")
-QgsProject.instance().addMapLayer(layer, True)
+unwrap(QgsProject.instance()).addMapLayer(layer, True)
 layer.setName("Cycling Quality Index")
 layer.loadNamedStyle(project_dir + "/styles/index.qml")
 # focus on output layer
-iface.mapCanvas().setExtent(layer.extent())
+iface.mapCanvas().setExtent(layer.extent()) # type: ignore
 
 print(time.strftime("%H:%M:%S", time.localtime()), "Finished processing.")
 print(time.strftime("%H:%M:%S", time.localtime()), "Check for regressions")
