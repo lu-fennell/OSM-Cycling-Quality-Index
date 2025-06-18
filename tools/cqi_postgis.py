@@ -48,7 +48,7 @@ class SidepathEntry:
         if r.buffer_layer == r.road_layer:
             _add_entry(self.road_ids, r.road_id, r.buffer_nr )
             _add_entry(self.highways, r.road_highway, r.buffer_nr)
-            _add_entry(self.names, r.road_name, r.buffer_nr)
+            _add_entry(self.names, _empty_for_none(r.road_name), r.buffer_nr)
             _max_entry(self.maxspeed, r.road_highway, _float_or_none(r.maxspeed))
 
     def result(self) -> SidepathEntryResult:
@@ -118,6 +118,12 @@ def _float_or_none(s: str | None) -> float | None:
         return float(s)
     except ValueError:
         return None
+
+def _empty_for_none(s: str | None) -> str:
+    if s is None:
+        return ""
+    else:
+        return s
 
 
 def generate_sidepath_dict(db_url: str, roads_table: sql.Identifier, paths_table: sql.Identifier, format: str):
@@ -279,7 +285,7 @@ def get_db_url_from_env() -> str:
     env_name = 'GEO_DATABASE_URL'
     db_url = os.getenv(env_name)
     if db_url is None:
-        print('ERROR: ', f"Please specify a postgres connection url in environment variable {env_name}")
+        print('ERROR: ', f"Please specify a postgres connection url in environment variable {env_name}", file=sys.stderr)
         sys.exit(-1)
     return db_url
                 
