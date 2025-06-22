@@ -30,11 +30,27 @@ def info(msg: str):
 def info_nonl(msg: str):
     print(f'{colorize('INFO', Color.BOLD)}: {msg}', end = '', flush = True)
 
+def read_jsonl(fname: str) -> dict:
+    result = {}
+    with open(fname) as f:
+        for l in f:
+            l_array = json.loads(l)
+            result[l_array[0]] = {
+                'checks': l_array[1],
+                'id': l_array[2],
+                'highway': l_array[3],
+                'name': l_array[4],
+                'maxspeed': l_array[5]
+            }
+    return result
 
 def read_json(fname: str) -> dict:
-    with open(fname) as f:
-        result = json.load(f)
-    return result
+    if fname.endswith('jsonl'):
+        return read_jsonl(fname)
+    else:
+        with open(fname) as f:
+            result = json.load(f)
+        return result
 
 def similar_coordinates(tol: float, c1: list[list[float]], c2: list[list[float]]) -> bool:
     return (len(c1) == len(c2) and all([ math.isclose(n1, n2, abs_tol=tol) for ns1, ns2 in zip(c1, c2) for n1, n2 in zip(ns1, ns2) ]))
@@ -221,7 +237,7 @@ class InputFileType(Enum):
 def input_file_type(f: str) -> InputFileType:
     if f.endswith('.geojson'):
         return InputFileType.GEOJSON
-    elif f.endswith('.json'):
+    elif f.endswith('.json') or f.endswith('.jsonl'):
         return InputFileType.JSON
     else:
         # TODO: maybe check that this is a dir?

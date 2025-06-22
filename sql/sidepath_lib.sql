@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION jsonb_set_contains(o jsonb, t text) RETURNS boolean A
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_dict_add_entry(o jsonb, k text, buffer_id bigint) RETURNS jsonb AS $$
-  SELECT o || jsonb_build_object(text_empty_if_null(k), jsonb_set_add(jsonb_get_set(o, k), buffer_id::text))
+  SELECT o || jsonb_build_object(text_empty_if_null(k), jsonb_set_add(jsonb_get_set(o, text_empty_if_null(k)), buffer_id::text))
 $$ LANGUAGE SQL;
 
 -- TODO: use "intset" functions
@@ -36,8 +36,9 @@ CREATE OR REPLACE FUNCTION sidepath_dict_inc_field(o jsonb, visited jsonb, field
   )
 $$ LANGUAGE SQL;
 
+-- TODO: do this with exception handling
 CREATE OR REPLACE FUNCTION sidepath_dict_valid_int(v text) RETURNS boolean AS $$
-  SELECT CASE WHEN v IS NULL OR v = 'walk' THEN FALSE ELSE TRUE END
+  SELECT v IS NOT NULL AND v ~ '^[0-9][0-9.]*$' 
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_dict_max_field(o jsonb, field text, value text) RETURNS jsonb AS $$
@@ -49,14 +50,20 @@ CREATE OR REPLACE FUNCTION sidepath_dict_max_field(o jsonb, field text, value te
 $$ LANGUAGE SQL;
 
 
-CREATE OR REPLACE FUNCTION sidepath_dict_add_result(result jsonb, visited jsonb, buffer_id bigint, road_id text, tags jsonb) RETURNS jsonb AS $$
-  SELECT jsonb_build_object(
-    'checks', integer_inc_not_visited(visited -> 'nrs', buffer_id::text, jsonb_get_or_default(result, 'checks', '0'::jsonb)::integer),
-    'id', sidepath_dict_inc_field(result -> 'id', visited -> 'road_ids', road_id, buffer_id),
-    'highway', sidepath_dict_inc_field(result -> 'highway', visited -> 'highways', tags ->> 'highway', buffer_id),
-    'name', sidepath_dict_inc_field(result -> 'name', visited -> 'names', tags ->> 'name', buffer_id),
-    'maxspeed', sidepath_dict_max_field(result -> 'maxspeed', tags ->> 'highway', (tags ->> 'maxspeed'))
-  ) 
+CREATE OR REPLACE FUNCTION sidepath_dict_add_result(result jsonb, visited jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
+  SELECT CASE WHEN (buffer_layer is NULL AND tags ->> 'layer' IS NULL) OR buffer_layer = tags ->> 'layer' THEN
+    jsonb_build_object(
+      'checks', integer_inc_not_visited(visited -> 'nrs', buffer_id::text, jsonb_get_or_default(result, 'checks', '0'::jsonb)::integer),
+      'id', sidepath_dict_inc_field(result -> 'id', visited -> 'road_ids', road_id, buffer_id),
+      'highway', sidepath_dict_inc_field(result -> 'highway', visited -> 'highways', tags ->> 'highway', buffer_id),
+      'name', sidepath_dict_inc_field(result -> 'name', visited -> 'names', tags ->> 'name', buffer_id),
+      'maxspeed', sidepath_dict_max_field(result -> 'maxspeed', tags ->> 'highway', (tags ->> 'maxspeed'))
+    ) ELSE
+    result || jsonb_build_object(
+    -- TODO: dedup
+          'checks', integer_inc_not_visited(visited -> 'nrs', buffer_id::text, jsonb_get_or_default(result, 'checks', '0'::jsonb)::integer)
+        )
+    END
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION  sidepath_dict_add_visited(visited jsonb, buffer_id bigint, road_id text, tags jsonb) RETURNS jsonb AS $$
@@ -68,10 +75,10 @@ CREATE OR REPLACE FUNCTION  sidepath_dict_add_visited(visited jsonb, buffer_id b
        )
 $$ LANGUAGE SQL;
 
-CREATE OR REPLACE FUNCTION sidepath_dict_acc(acc jsonb, buffer_id bigint, road_id text, tags jsonb) RETURNS jsonb AS $$
+CREATE OR REPLACE FUNCTION sidepath_dict_acc(acc jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
   SELECT jsonb_build_object(
       'visited', sidepath_dict_add_visited(acc -> 'visited', buffer_id, road_id, tags),
-      'result', sidepath_dict_add_result(acc -> 'result', acc -> 'visited', buffer_id, road_id, tags)
+      'result', sidepath_dict_add_result(acc -> 'result', acc -> 'visited', buffer_id, buffer_layer, road_id, tags)
       )
 $$ LANGUAGE SQL;
 
@@ -79,7 +86,7 @@ CREATE OR REPLACE FUNCTION sidepath_dict_get_result(acc jsonb) RETURNS jsonb AS 
   SELECT acc -> 'result'
 $$ LANGUAGE SQL;
 
-CREATE OR REPLACE AGGREGATE sidepath_dict_agg(buffer_id bigint, road_id text, tags jsonb) (
+CREATE OR REPLACE AGGREGATE sidepath_dict_agg(buffer_id bigint, buffer_layer text, road_id text, tags jsonb) (
   sfunc = sidepath_dict_acc,
   stype = jsonb,
   finalfunc = sidepath_dict_get_result,
