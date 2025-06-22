@@ -6,6 +6,13 @@
 
 \ir sidepath_lib.sql
 
+\pset format unaligned
+\pset tuples_only on
+
+CREATE OR REPLACE FUNCTION sidepath_dict_output_item(id text, sidepath_dict jsonb) RETURNS jsonb as $$
+  SELECT json_array(id, sidepath_dict -> 'checks', sidepath_dict -> 'id', sidepath_dict -> 'highway', sidepath_dict -> 'name', sidepath_dict -> 'maxspeed')
+$$ LANGUAGE SQL;
+
 WITH points AS (
   SELECT
     id,
@@ -34,8 +41,7 @@ WITH points AS (
     id
 )
 SELECT
-  points.id AS buffer_id,
-  sidepath_dict_agg(points.nr, roads.id, roads.tags -> 'tags')
+  sidepath_dict_output_item(points.id, sidepath_dict_agg(points.nr, roads.id, roads.tags -> 'tags'))
 FROM
   points
   LEFT OUTER JOIN :roads_table AS roads ON ST_DWithin(points.geom, roads.geom, :buffer_size)
