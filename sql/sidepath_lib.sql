@@ -24,9 +24,9 @@ $$ LANGUAGE SQL;
 CREATE OR REPLACE FUNCTION sidepath_dict_acc(acc jsonb, buffer_id bigint, road_id text, tags jsonb) RETURNS jsonb AS $$
   SELECT acc || jsonb_build_object(
     'nrs', jsonb_set_add(jsonb_get_set(acc, 'nrs'), buffer_id::text),
-    'road_ids', sidepath_dict_add_entry(jsonb_get_set('road_ids'), road_id, buffer_id),
-    'highways', sidepath_dict_add_entry(jsonb_get_set('highways'), tags ->> 'highway', buffer_id),
-    'names', sidepath_dict_add_entry(jsonb_get_set('names'), tags ->> 'name', buffer_id)
+    'road_ids', sidepath_dict_add_entry(jsonb_get_set(acc, 'road_ids'), road_id, buffer_id),
+    'highways', sidepath_dict_add_entry(jsonb_get_set(acc, 'highways'), tags ->> 'highway', buffer_id),
+    'names', sidepath_dict_add_entry(jsonb_get_set(acc, 'names'), tags ->> 'name', buffer_id)
     )
   AS result
 $$ LANGUAGE SQL;
