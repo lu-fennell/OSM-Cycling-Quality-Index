@@ -1,22 +1,12 @@
 \set QUIET on
 \set ON_ERROR_STOP on
 
----------------------------------
--- BEGIN adjustable parameters
--- 
-\set buffer_size 22.0
-\set buffer_distance 100.0 
+-- set parameter defaults
+\if :{?buffer_size} \else  \set buffer_size 22.0 \endif
+\if :{?buffer_distance} \else \set buffer_distance 100.0 \endif
 
--- \set paths_table cqi_paths
--- \set roads_table cqi_roads
-\set paths_table way_import_paths
-\set roads_table way_import_roads
-
--- 
--- END adjustable parameters
--- 
----------------------------------
-
+\if :{?paths_table} \else \set paths_table way_import_paths \endif
+\if :{?roads_table} \else \set roads_table way_import_roads \endif
 
 -- disable output during loading of lib
 \o /dev/null 
