@@ -10,18 +10,26 @@
 
 -- disable output during loading of lib
 \o /dev/null 
+ 
 -- Load sidepath_lib
 \ir sidepath_lib.sql
+ 
 -- enable output again
-\o 
+\if :{?outfile}
+  \o :outfile
+\else
+  \o
+\endif
 
 -- set "jsonl"-compatible formatting
 \pset format unaligned
 \pset tuples_only on
+
 CREATE OR REPLACE FUNCTION sidepath_dict_format_jsonl(id text, sidepath_dict jsonb) RETURNS jsonb as $$
   SELECT json_array(id, sidepath_dict -> 'checks', sidepath_dict -> 'id', sidepath_dict -> 'highway', sidepath_dict -> 'name', sidepath_dict -> 'maxspeed')
 $$ LANGUAGE SQL;
 
+-- query to generate the sidepath_dict
 WITH points AS (
   SELECT
     id,
