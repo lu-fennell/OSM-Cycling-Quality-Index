@@ -190,8 +190,6 @@ def compare_files(f1: str, f2: str) -> list[str]:
         case (t1, t2):
             warn(f'Comparison not implemented: {f1}:{t1} and {f2}:{t2}')
             return []
-        case _:
-            raise Exception('unreachable')
 
 def compare_dirs(d1: str, d2: str) -> list[str]:
     names1 = set(os.listdir(d1))

@@ -22,7 +22,11 @@ CREATE OR REPLACE FUNCTION jsonb_set_contains(o jsonb, t text) RETURNS boolean A
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_dict_add_entry(o jsonb, k text, buffer_id bigint) RETURNS jsonb AS $$
-  SELECT o || jsonb_build_object(text_empty_if_null(k), jsonb_set_add(jsonb_get_set(o, text_empty_if_null(k)), buffer_id::text))
+  SELECT CASE WHEN k is NULL THEN
+    o
+  ELSE
+    o || jsonb_build_object(k, jsonb_set_add(jsonb_get_set(o, k), buffer_id::text))
+  END
 $$ LANGUAGE SQL;
 
 -- TODO: use "intset" functions
@@ -31,12 +35,15 @@ CREATE OR REPLACE FUNCTION integer_inc_not_visited(visited jsonb, t text, n inte
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_dict_inc_field(o jsonb, visited jsonb, field text, buffer_id bigint) RETURNS jsonb AS $$
-  SELECT o || jsonb_build_object(
-    text_empty_if_null(field), integer_inc_not_visited(visited -> field, buffer_id::text, jsonb_get_or_default(o, text_empty_if_null(field), '0'::jsonb)::integer)
-  )
+  SELECT CASE WHEN field IS NULL THEN o
+  ELSE
+    o || jsonb_build_object(
+      field, integer_inc_not_visited(visited -> field, buffer_id::text, jsonb_get_or_default(o, field, '0'::jsonb)::integer)
+    )
+  END
 $$ LANGUAGE SQL;
 
--- TODO: do this with exception handling
+-- TODO: do this with exception handling (?)
 CREATE OR REPLACE FUNCTION sidepath_dict_valid_int(v text) RETURNS boolean AS $$
   SELECT v IS NOT NULL AND v ~ '^[0-9][0-9.]*$' 
 $$ LANGUAGE SQL;
@@ -49,14 +56,20 @@ CREATE OR REPLACE FUNCTION sidepath_dict_max_field(o jsonb, field text, value te
     END
 $$ LANGUAGE SQL;
 
+CREATE OR REPLACE FUNCTION text_both_null_or_eq(v1 text, v2 text) RETURNS boolean AS $$
+  SELECT (v1 IS NULL AND v2 IS NULL) OR v1 = v2
+$$ LANGUAGE SQL;
+
 
 CREATE OR REPLACE FUNCTION sidepath_dict_add_result(result jsonb, visited jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
-  SELECT CASE WHEN (buffer_layer is NULL AND tags ->> 'layer' IS NULL) OR buffer_layer = tags ->> 'layer' THEN
+  SELECT CASE WHEN
+    text_both_null_or_eq(buffer_layer, tags ->> 'layer')
+    THEN
     jsonb_build_object(
       'checks', integer_inc_not_visited(visited -> 'nrs', buffer_id::text, jsonb_get_or_default(result, 'checks', '0'::jsonb)::integer),
       'id', sidepath_dict_inc_field(result -> 'id', visited -> 'road_ids', road_id, buffer_id),
       'highway', sidepath_dict_inc_field(result -> 'highway', visited -> 'highways', tags ->> 'highway', buffer_id),
-      'name', sidepath_dict_inc_field(result -> 'name', visited -> 'names', tags ->> 'name', buffer_id),
+      'name', sidepath_dict_inc_field(result -> 'name', visited -> 'names', text_empty_if_null(tags ->> 'name'), buffer_id),
       'maxspeed', sidepath_dict_max_field(result -> 'maxspeed', tags ->> 'highway', (tags ->> 'maxspeed'))
     ) ELSE
     result || jsonb_build_object(
@@ -66,18 +79,25 @@ CREATE OR REPLACE FUNCTION sidepath_dict_add_result(result jsonb, visited jsonb,
     END
 $$ LANGUAGE SQL;
 
-CREATE OR REPLACE FUNCTION  sidepath_dict_add_visited(visited jsonb, buffer_id bigint, road_id text, tags jsonb) RETURNS jsonb AS $$
-  SELECT jsonb_build_object(
-        'nrs', jsonb_set_add(jsonb_get_set(visited, 'nrs'), buffer_id::text),
-        'road_ids', sidepath_dict_add_entry(jsonb_get_set(visited, 'road_ids'), road_id, buffer_id),
-        'highways', sidepath_dict_add_entry(jsonb_get_set(visited, 'highways'), tags ->> 'highway', buffer_id),
-        'names', sidepath_dict_add_entry(jsonb_get_set(visited, 'names'), tags ->> 'name', buffer_id)
-       )
+CREATE OR REPLACE FUNCTION  sidepath_dict_add_visited(visited jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
+  SELECT CASE WHEN text_both_null_or_eq(buffer_layer, tags ->> 'layer') THEN
+    jsonb_build_object(
+          'nrs', jsonb_set_add(jsonb_get_set(visited, 'nrs'), buffer_id::text),
+          'road_ids', sidepath_dict_add_entry(jsonb_get_set(visited, 'road_ids'), road_id, buffer_id),
+          'highways', sidepath_dict_add_entry(jsonb_get_set(visited, 'highways'), tags ->> 'highway', buffer_id),
+          'names', sidepath_dict_add_entry(jsonb_get_set(visited, 'names'), text_empty_if_null(tags ->> 'name'), buffer_id)
+     )
+    ELSE
+    -- TODO: dedup
+      visited || jsonb_build_object(
+        'nrs', jsonb_set_add(jsonb_get_set(visited, 'nrs'), buffer_id::text)
+      )
+    END
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_dict_acc(acc jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
   SELECT jsonb_build_object(
-      'visited', sidepath_dict_add_visited(acc -> 'visited', buffer_id, road_id, tags),
+      'visited', sidepath_dict_add_visited(acc -> 'visited', buffer_id, buffer_layer, road_id, tags),
       'result', sidepath_dict_add_result(acc -> 'result', acc -> 'visited', buffer_id, buffer_layer, road_id, tags)
       )
 $$ LANGUAGE SQL;

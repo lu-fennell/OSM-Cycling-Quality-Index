@@ -179,6 +179,8 @@ def generate_sidepath_dict(db_url: str, roads_table: sql.Identifier, paths_table
                         current_buffer_id = row.buffer_id
                         current_sidepath_entry = SidepathEntry()
                     current_sidepath_entry.add_row(row)
+                if current_buffer_id is not None:
+                    writer.write_entry(current_buffer_id, current_sidepath_entry.result())
 
 
 class GeomType(Enum):
