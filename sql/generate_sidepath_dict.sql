@@ -1,4 +1,9 @@
+\set QUIET on
+\set ON_ERROR_STOP on
 
+---------------------------------
+-- BEGIN adjustable parameters
+-- 
 \set buffer_size 22.0
 \set buffer_distance 100.0 
 
@@ -7,13 +12,23 @@
 \set paths_table way_import_paths
 \set roads_table way_import_roads
 
+-- 
+-- END adjustable parameters
+-- 
+---------------------------------
+
+
+-- disable output during loading of lib
+\o /dev/null 
+-- Load sidepath_lib
+\ir sidepath_lib.sql
+-- enable output again
+\o 
+
+-- set "jsonl"-compatible formatting
 \pset format unaligned
 \pset tuples_only on
-
-\ir sidepath_lib.sql
-
-
-CREATE OR REPLACE FUNCTION sidepath_dict_output_item(id text, sidepath_dict jsonb) RETURNS jsonb as $$
+CREATE OR REPLACE FUNCTION sidepath_dict_format_jsonl(id text, sidepath_dict jsonb) RETURNS jsonb as $$
   SELECT json_array(id, sidepath_dict -> 'checks', sidepath_dict -> 'id', sidepath_dict -> 'highway', sidepath_dict -> 'name', sidepath_dict -> 'maxspeed')
 $$ LANGUAGE SQL;
 
@@ -45,7 +60,7 @@ WITH points AS (
     id
 )
 SELECT
-  sidepath_dict_output_item(points.id, sidepath_dict_agg(points.nr, points.layer, roads.id, roads.tags -> 'tags'))
+  sidepath_dict_format_jsonl(points.id, sidepath_dict_agg(points.nr, points.layer, roads.id, roads.tags -> 'tags'))
 FROM
   points
   LEFT OUTER JOIN :roads_table AS roads ON ST_DWithin(points.geom, roads.geom, :buffer_size)
