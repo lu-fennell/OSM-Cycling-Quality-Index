@@ -1,6 +1,8 @@
 # pyright: reportMissingModuleSource=false
  
+from dataclasses import dataclass
 from typing import TypeVar, cast
+from cqi.sidepath import SidepathDictEntry
 from cqi.util import unwrap
 from qgis.core import NULL, edit  # type: ignore[attr-defined]
 
@@ -482,6 +484,7 @@ class AttributeIds:
 def attribute_ids(layer:QgsVectorLayer) -> AttributeIds:
     return AttributeIds(layer)
 
+# TODO: rename
 def sidepath_classification(features: FeatureSet, sidepath_dict: dict, attrs: AttributeIds):
 
     # TODO: port to feature_set
@@ -530,36 +533,10 @@ def sidepath_classification(features: FeatureSet, sidepath_dict: dict, attrs: At
             if feature.attribute("footway") == "sidewalk":
                 is_sidepath = "yes"
             is_sidepath_of = feature.attribute("is_sidepath:of")
-            checks = sidepath_dict[id]["checks"]
 
-            if not is_sidepath:
-                is_sidepath = "no"
-
-                for road_id in sidepath_dict[id]["id"].keys():
-                    if checks <= 2:
-                        if sidepath_dict[id]["id"][road_id] == checks:
-                            is_sidepath = "yes"
-                    else:
-                        if sidepath_dict[id]["id"][road_id] >= checks * 0.66:
-                            is_sidepath = "yes"
-
-                if is_sidepath != "yes":
-                    for highway in sidepath_dict[id]["highway"].keys():
-                        if checks <= 2:
-                            if sidepath_dict[id]["highway"][highway] == checks:
-                                is_sidepath = "yes"
-                        else:
-                            if sidepath_dict[id]["highway"][highway] >= checks * 0.66:
-                                is_sidepath = "yes"
-
-                if is_sidepath != "yes":
-                    for name in sidepath_dict[id]["name"].keys():
-                        if checks <= 2:
-                            if sidepath_dict[id]["name"][name] == checks:
-                                is_sidepath = "yes"
-                        else:
-                            if sidepath_dict[id]["name"][name] >= checks * 0.66:
-                                is_sidepath = "yes"
+            if not is_sidepath :
+                entry = SidepathDictEntry.from_dict(sidepath_dict[id])
+                is_sidepath = "yes" if entry.is_sidepath() else "no"
 
             layer.changeAttributeValue(feature.id(), attrs.id_proc_sidepath, is_sidepath)
 

@@ -109,3 +109,18 @@ CREATE OR REPLACE AGGREGATE sidepath_dict_agg(buffer_id bigint, buffer_layer tex
       "result": { "checks": 0, "id": {}, "highway": {}, "name": {}, "maxspeed": {} }
     }'
 );
+
+CREATE OR REPLACE FUNCTION sidepath_dict_is_sidepath_by_checks(checks int, histogram jsonb) RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT value FROM jsonb_each(histogram)
+    WHERE (checks <= 2 AND value::int = checks)
+    OR    checks::float * 0.66 <= value::float
+  )
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION sidepath_dict_is_sidepath(entry jsonb) RETURNS boolean AS $$
+  SELECT
+    sidepath_dict_is_sidepath_by_checks((entry -> 'checks')::int, entry -> 'id')
+    OR sidepath_dict_is_sidepath_by_checks((entry -> 'checks')::int, entry -> 'highway')
+    OR sidepath_dict_is_sidepath_by_checks((entry -> 'checks')::int, entry -> 'name')
+$$ LANGUAGE SQL;
