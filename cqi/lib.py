@@ -484,7 +484,6 @@ class AttributeIds:
 def attribute_ids(layer:QgsVectorLayer) -> AttributeIds:
     return AttributeIds(layer)
 
-# TODO: rename
 def sidepath_classification(features: FeatureSet, sidepath_dict: dict, attrs: AttributeIds):
 
     # TODO: port to feature_set

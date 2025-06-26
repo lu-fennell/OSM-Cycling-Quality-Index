@@ -16,8 +16,6 @@ class SidepathEntryTest:
     def assert_is_sidepath(self, expected: bool, entry: dict):
         raise Exception('abstract method not implemented')
 
-    # TODO: empty cases
-    # TODO: combination of fields
     def test_is_sidepath__id_1(self):
         self.assert_is_sidepath(
            True,
@@ -89,6 +87,84 @@ class SidepathEntryTest:
         self.assert_is_sidepath(
            False,
            { 'checks': 6, 'name': {'id1': 2, 'id2': 2} },
+        )
+
+        
+    def test_is_sidepath__id_name_1(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'name': {'n1': 2}, 'id': {'i1': 1} }
+        )
+
+    def test_is_sidepath__id_name_2(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'name': {'n1': 1}, 'id': {'i1': 2} }
+        )
+
+    def test_is_sidepath__id_name_3(self):
+        self.assert_is_sidepath(
+           False,
+           { 'checks': 3, 'name': {'n1': 1}, 'id': {'i1': 1} }
+        )
+
+    def test_is_sidepath__id_highway_1(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'highway': {'h1': 2}, 'id': {'i1': 1} }
+        )
+
+    def test_is_sidepath__id_highway_2(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'highway': {'h1': 1}, 'id': {'i1': 2} }
+        )
+
+    def test_is_sidepath__id_highway_3(self):
+        self.assert_is_sidepath(
+           False,
+           { 'checks': 3, 'highway': {'h1': 1}, 'id': {'i1': 1} }
+        )
+
+    def test_is_sidepath__name_highway_1(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'highway': {'h1': 1}, 'name': {'n1': 2} }
+        )
+
+    def test_is_sidepath__name_highway_2(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'highway': {'h1': 2}, 'name': {'n1': 1} }
+        )
+
+    def test_is_sidepath__name_highway_3(self):
+        self.assert_is_sidepath(
+           False,
+           { 'checks': 3, 'highway': {'h1': 1}, 'name': {'n1': 1} }
+        )
+
+
+    def test_is_sidepath__id_name_highway_1(self):
+        self.assert_is_sidepath(
+           False,
+           { 'checks': 3, 'name': {'id1': 1}, 'highway': { 'h1': 1 }, 'id': {'i1': 1} }
+        )
+
+    def test_is_sidepath__id_name_highway_2(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'name': {'id1': 2}, 'highway': { 'h1': 1 }, 'id': {'i1': 1} }
+        )
+    def test_is_sidepath__id_name_highway_3(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'name': {'id1': 1}, 'highway': { 'h1': 2 }, 'id': {'i1': 1} }
+        )
+    def test_is_sidepath__id_name_highway_4(self):
+        self.assert_is_sidepath(
+           True,
+           { 'checks': 3, 'name': {'id1': 1}, 'highway': { 'h1': 1 }, 'id': {'i1': 2} }
         )
 
 class CqilibSidepathEntryTest(unittest.TestCase, SidepathEntryTest):
