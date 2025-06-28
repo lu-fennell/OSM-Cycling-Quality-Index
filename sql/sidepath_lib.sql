@@ -89,8 +89,33 @@ CREATE OR REPLACE FUNCTION  sidepath_dict_add_visited(visited jsonb, buffer_id b
          END
 $$ LANGUAGE SQL;
 
+CREATE OR REPLACE FUNCTION sidepath_dict_acc_init_if_null(acc jsonb) RETURNS jsonb AS $$
+  SELECT CASE WHEN acc IS NULL
+    THEN '{
+      "visited": { "nrs": {}, "road_ids": {}, "highways": {}, "names": {} },
+      "result": { "checks": 0, "id": {}, "highway": {}, "name": {}, "maxspeed": {} }
+      }'::jsonb
+    ELSE
+      acc
+    END
+$$ LANGUAGE SQL;
+
+-- TODO: fix this version
+CREATE OR REPLACE FUNCTION sidepath_dict_acc_without_nulls(acc jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
+  SELECT CASE WHEN tags IS NOT NULL 
+    THEN
+     jsonb_build_object(
+      'visited', sidepath_dict_add_visited(sidepath_dict_acc_init_if_null(acc) -> 'visited', buffer_id, buffer_layer, road_id, tags),
+      'result', sidepath_dict_add_result(sidepath_dict_acc_init_if_null(acc) -> 'result', acc -> 'visited', buffer_id, buffer_layer, road_id, tags)
+      )
+    ELSE
+      acc
+    END
+$$ LANGUAGE SQL;
+
+
 CREATE OR REPLACE FUNCTION sidepath_dict_acc(acc jsonb, buffer_id bigint, buffer_layer text, road_id text, tags jsonb) RETURNS jsonb AS $$
-  SELECT jsonb_build_object(
+  SELECT   jsonb_build_object(
       'visited', sidepath_dict_add_visited(acc -> 'visited', buffer_id, buffer_layer, road_id, tags),
       'result', sidepath_dict_add_result(acc -> 'result', acc -> 'visited', buffer_id, buffer_layer, road_id, tags)
       )
@@ -104,11 +129,10 @@ CREATE OR REPLACE AGGREGATE sidepath_dict_agg(buffer_id bigint, buffer_layer tex
   sfunc = sidepath_dict_acc,
   stype = jsonb,
   finalfunc = sidepath_dict_get_result,
-  initcond = '{
+  initcond =  '{
       "visited": { "nrs": {}, "road_ids": {}, "highways": {}, "names": {} },
       "result": { "checks": 0, "id": {}, "highway": {}, "name": {}, "maxspeed": {} }
-    }'
-);
+      }');
 
 CREATE OR REPLACE FUNCTION sidepath_dict_interpolated_points(point_distance float, geom geometry) RETURNS setof geometry AS $$
   SELECT (
@@ -130,11 +154,29 @@ CREATE OR REPLACE FUNCTION sidepath_dict_interpolated_points(point_distance floa
     ).geom
 $$ LANGUAGE SQL;
 
+
+CREATE OR REPLACE FUNCTION sidepath_dict_is_sidepath_by_checks(checks int, histogram jsonb) RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT value FROM jsonb_each(histogram)
+    WHERE (checks <= 2 AND value::int = checks)
+    OR    checks::float * 0.66 <= value::float
+  )
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION sidepath_dict_is_sidepath(entry jsonb) RETURNS boolean AS $$
+  SELECT
+    sidepath_dict_is_sidepath_by_checks((entry -> 'checks')::int, entry -> 'id')
+    OR sidepath_dict_is_sidepath_by_checks((entry -> 'checks')::int, entry -> 'highway')
+    OR sidepath_dict_is_sidepath_by_checks((entry -> 'checks')::int, entry -> 'name')
+$$ LANGUAGE SQL;
+
 CREATE OR REPLACE FUNCTION sidepath_dict_format_jsonl(id text, sidepath_dict jsonb) RETURNS jsonb as $$
   SELECT json_array(id, sidepath_dict -> 'checks', sidepath_dict -> 'id', sidepath_dict -> 'highway', sidepath_dict -> 'name', sidepath_dict -> 'maxspeed')
 $$ LANGUAGE SQL;
 
-PREPARE sidepath_dict(float, float) AS
+
+CREATE OR REPLACE FUNCTION sidepath_dict_left_outer_join(buffer_distance float, buffer_size float)
+  RETURNS TABLE (id text, nr bigint, layer text, road_id text, tags jsonb) AS $$
   WITH points AS (
     SELECT
       id,
@@ -147,11 +189,33 @@ PREPARE sidepath_dict(float, float) AS
       id
   )
   SELECT
-    sidepath_dict_format_jsonl(points.id, sidepath_dict_agg(points.nr, points.layer, roads.id, roads.tags -> 'tags'))
+    points.id, points.nr, points.layer, roads.id, roads.tags -> 'tags'
   FROM
     points
     LEFT OUTER JOIN _sidepath_estimation_roads AS roads ON ST_DWithin(points.geom, roads.geom, $2)
-  GROUP BY points.id
   ORDER BY
-    points.id;
+    points.id
+$$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION sidepath_dict_join(buffer_distance float, buffer_size float)
+  RETURNS TABLE (id text, nr bigint, layer text, road_id text, tags jsonb) AS $$
+  WITH points AS (
+    SELECT
+      id,
+      nextval('buffer_nr_sequence') AS nr,
+      tags -> 'tags' ->> 'layer' as layer,
+      (sidepath_dict_interpolated_points($1, geom)) AS geom
+    FROM
+      _sidepath_estimation_paths
+    ORDER BY
+      id
+  )
+  SELECT
+    points.id, points.nr, points.layer, roads.id, roads.tags -> 'tags'
+  FROM
+    points
+    JOIN _sidepath_estimation_roads AS roads ON ST_DWithin(points.geom, roads.geom, $2)
+  ORDER BY
+    points.id
+$$ LANGUAGE SQL;
 
