@@ -5,14 +5,8 @@
 \if :{?buffer_size} \else  \set buffer_size 22.0 \endif
 \if :{?buffer_distance} \else \set buffer_distance 100.0 \endif
 
-\if :{?paths_table} \else \set paths_table way_import_paths \endif
-\if :{?roads_table} \else \set roads_table way_import_roads \endif
-
 -- disable output during loading of lib
 \o /dev/null 
-
-CREATE TEMPORARY VIEW _sidepath_estimation_paths as SELECT * FROM :paths_table;
-CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
 
 -- Load sidepath_lib
 \ir sidepath_lib.sql
@@ -24,7 +18,7 @@ CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
   \o
 \endif
 
-\echo `date` 'Start generating sidepath dict for' :paths_table 'and' :roads_table
+\echo `date` 'Start generating sidepath dict'
 
 -- set "jsonl"-compatible formatting
 \pset format unaligned
