@@ -199,8 +199,8 @@ class Feature:
     def from_dict(d: dict) -> "Feature":
         properties = d["properties"]
         geometry = d["geometry"]
-        id = properties.get("id") or properties.get("@id")
-        return Feature(id, properties, geometry)
+        id : str = properties.get("id") or properties.get("@id")
+        return Feature(id.removeprefix('way/'), properties, geometry)
 
     def geom_type(self) -> GeomType:
         match self.geometry["type"]:
@@ -242,7 +242,7 @@ def create_and_clear_table(cur: Cursor, table: sql.Identifier, srid: int):
             DROP TABLE IF EXISTS {table}""").format(table=table))
     cur.execute(sql.SQL("""
             CREATE TABLE {table} (
-                id text,
+                id bigint,
                 tags jsonb,
                 geom geometry(LINESTRING, {srid})
             )""").format(table=table, srid=sql.Literal(srid)), )
