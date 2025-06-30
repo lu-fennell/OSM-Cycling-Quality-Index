@@ -22,11 +22,14 @@ class Row:
 
 @dataclass
 class SidepathEntryResult:
-    count: int
-    road_ids: dict[str, int]
-    highways: dict[str, int]
-    names: dict[str, int]
+    checks: int
+    id: dict[str, int]
+    highway: dict[str, int]
+    name: dict[str, int]
     maxspeed: dict[str, float]
+
+    def to_dict(self) -> dict:
+        return self.__dict__
 
 @dataclass
 class SidepathEntry:
@@ -53,12 +56,13 @@ class SidepathEntry:
 
     def result(self) -> SidepathEntryResult:
         return SidepathEntryResult(
-            count=len(self.nrs),
-            road_ids=_histogram(self.road_ids),
-            highways=_histogram(self.highways),
-            names=_histogram(self.names),
+            checks=len(self.nrs),
+            id=_histogram(self.road_ids),
+            highway=_histogram(self.highways),
+            name=_histogram(self.names),
             maxspeed=self.maxspeed
         )
+
 
 def _add_entry(d: dict[str, set[int]], key: str, nr: int):
     if key is not None:
@@ -80,11 +84,7 @@ class SidepathDictStream:
     def write_entry(self, buffer_id, sidepath_entry):
         print(json.dumps([
           buffer_id,
-          sidepath_entry.count,
-          sidepath_entry.road_ids,
-          sidepath_entry.highways,
-          sidepath_entry.names,
-          sidepath_entry.maxspeed,
+          sidepath_entry.to_dict()
         ]))
 
 class SidepathDictObj:
@@ -97,10 +97,10 @@ class SidepathDictObj:
         return False
     def write_entry(self, buffer_id: str, sidepath_entry: SidepathEntryResult):
         self.obj[buffer_id] = {
-            'checks': sidepath_entry.count,
-            'id': sidepath_entry.road_ids,
-            'highway': sidepath_entry.highways,
-            'name': sidepath_entry.names,
+            'checks': sidepath_entry.checks,
+            'id': sidepath_entry.id,
+            'highway': sidepath_entry.highway,
+            'name': sidepath_entry.name,
             'maxspeed': sidepath_entry.maxspeed
         }
 

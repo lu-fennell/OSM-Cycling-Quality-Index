@@ -20,6 +20,8 @@ CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
 
 -- Load sidepath_lib
 \ir sidepath_lib.sql
+-- reset checkpoint_nr_sequence
+SELECT setval('checkpoint_nr_sequence', 1);
  
 -- enable output again
 \if :{?outfile}
@@ -38,26 +40,18 @@ CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
 
 -- TODO:  real    29m21.904s
 -- TODO: with new acc:  23m43.291s
--- SELECT sidepath_dict_format_jsonl(id, sidepath_dict_agg(nr, layer, road_id, tags)) FROM sidepath_dict_left_outer_join(:buffer_distance, :buffer_size)
--- GROUP BY id;
+SELECT sidepath_dict_jsonl(:buffer_distance, :buffer_size)
 
 -- TODO real    14m29.783s
 --  16m37.802s
-SELECT id FROM (
-  SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_join(:buffer_distance, :buffer_size)
-  GROUP BY id
-  )
-WHERE sidepath_dict_is_sidepath(entry);
+-- SELECT * FROM sidepath_idlist_yes(:buffer_distance, :buffer_size);
+--
 -- 
 --
 -- TODO: has to run with the "not-null" acc function
 -- TODO real    23m44.947s
 -- TODO: check if this is correct
--- SELECT id FROM (
---   SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_left_outer_join(:buffer_distance, :buffer_size)
---   GROUP BY id
---   )
--- WHERE entry IS NULL OR NOT sidepath_dict_is_sidepath(entry);
+-- SELECT * FROM sidepath_idlist_no(:buffer_distance, :buffer_size);
 
 
 
