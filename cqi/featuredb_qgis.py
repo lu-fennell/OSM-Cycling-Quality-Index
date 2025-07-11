@@ -51,7 +51,7 @@ class QgsFeatureDb(FeatureDb):
         
 
     def close(self):
-        self.project.removeMapLayers(self._added_layers)
+        self.project.removeMapLayers(list(self._added_layers))
 
     def _add_layer(self, layer: QgsVectorLayer) -> str:
         self.project.addMapLayer(layer, addToLegend=False)
