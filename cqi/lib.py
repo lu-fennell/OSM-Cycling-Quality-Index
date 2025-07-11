@@ -562,10 +562,8 @@ def sidepath_classification(features: FeatureSet, sidepath_dict: dict, attrs: At
                     )
             # transfer names to sidepath
             if is_sidepath == "yes" and len(sidepath_dict[id]["name"]):
-                name = max(
-                    sidepath_dict[id]["name"],
-                    key=lambda k: sidepath_dict[id]["name"][k],
-                )  # the most frequent name in the surrounding
+                (name, _) = max(sorted(sidepath_dict[id]['name'].items()),
+                                key=lambda i: i[1]) #the most frequent name in the surrounding
                 # TODO: why are names of sidepaths replaced? This happens even if they exist...
                 if name:
                     layer.changeAttributeValue(
