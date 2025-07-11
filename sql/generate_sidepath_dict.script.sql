@@ -1,6 +1,12 @@
 \set QUIET on
 \set ON_ERROR_STOP on
 
+
+-- quietly load sidepath_lib
+\o /dev/null 
+\ir sidepath_lib.sql
+\o
+
 -- set parameter defaults
 \if :{?buffer_size} \else  \set buffer_size 22.0 \endif
 \if :{?buffer_distance} \else \set buffer_distance 100.0 \endif
@@ -15,15 +21,10 @@ CREATE TEMPORARY VIEW _sidepath_estimation_paths as SELECT * FROM :paths_table;
 CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
 \endif
 
--- disable output during loading of lib
-\o /dev/null 
-
--- Load sidepath_lib
-\ir sidepath_lib.sql
 -- reset checkpoint_nr_sequence
 SELECT setval('checkpoint_nr_sequence', 1);
  
--- enable output again
+-- set output to outfile
 \if :{?outfile}
   \o :outfile
 \else
