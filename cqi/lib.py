@@ -39,7 +39,6 @@ def read_layer_geojson(geojson_file: str, name: str | None = None, filter : str 
         return QgsVectorLayer(geojson_file, "ogr")
 
 
-# TODO: remove
 def copy_to_mem_layer(layer: QgsVectorLayer) -> QgsVectorLayer:
     return process_to_mem_layer(
         "qgis:extractbyexpression",
@@ -47,7 +46,6 @@ def copy_to_mem_layer(layer: QgsVectorLayer) -> QgsVectorLayer:
     )
 
 
-# TODO: remove
 def process_to_mem_layer(name: str, opts: dict) -> QgsVectorLayer:
     opts = opts.copy()
     opts["OUTPUT"] = "memory:"
@@ -182,7 +180,6 @@ new_attributes_dict = {
 def tag_type(attr: str) -> TagType:
     return TagType.parse(new_attributes_dict.get(attr, "String"))
 
-# TODO: clean this up
 def ensure_cycling_attribute_types(layer: QgsVectorLayer):
     with edit(layer):
         fields = unwrap(layer.dataProvider()).fields()
@@ -358,7 +355,7 @@ def sidepath_dict(
                                      'name': {},
                                      'maxspeed': {}
                                  })
-        buffer_dict["checks"] += 1
+        buffer_dict['checks'] += 1
         layer_path_points_buffers.removeSelection()
         layer_path_points_buffers.select(buffer.id())
         feature_source = QgsProcessingFeatureSourceDefinition(
@@ -374,7 +371,6 @@ def sidepath_dict(
             },
         )
 
-        # TODO: these could be sets, but as we later on replace the names with the first occurence, we need to maintain the order to be equivalent to the original implementation
         id_list : list[str] = list()
         highway_list : list[str] = list()
         name_list : list[str] = list()
@@ -384,7 +380,6 @@ def sidepath_dict(
                 l.append(item)
         for road in layer_roads.selectedFeatures():
             road_layer = road.attribute("layer")
-            # TODO: is this happening? How can this happen?
             if buffer_layer != road_layer:
                 continue  # only consider geometries in the same layer
             road_id = road.attribute("id")
@@ -393,7 +388,6 @@ def sidepath_dict(
             road_maxspeed = d.getNumber(road.attribute("maxspeed"))
             _add_list(id_list, road_id)
             _add_list(highway_list, road_highway)
-            # TODO: probably should be a method on a maxspeed_dict wrapper
             if (
                 road_highway not in maxspeed_dict
                 or maxspeed_dict[road_highway] < road_maxspeed
