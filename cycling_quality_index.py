@@ -366,7 +366,8 @@ else:
                     layer.changeAttributeValue(feature.id(), id_proc_maxspeed, d.getNumber(maxspeed))
             #transfer names to sidepath
             if is_sidepath == 'yes' and len(sidepath_dict[id]['name']):
-                name = max(sidepath_dict[id]['name'], key=lambda k: sidepath_dict[id]['name'][k]) #the most frequent name in the surrounding
+                (name, _) = max(sorted(sidepath_dict[id]['name'].items()),
+                                key=lambda i: i[1]) #the most frequent name in the surrounding
                 if name:
                     layer.changeAttributeValue(feature.id(), layer.fields().indexOf('name'), name)
 
