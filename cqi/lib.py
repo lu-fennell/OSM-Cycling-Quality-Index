@@ -371,13 +371,10 @@ def sidepath_dict(
             },
         )
 
-        id_list : list[str] = list()
-        highway_list : list[str] = list()
-        name_list : list[str] = list()
+        id_list : set[str] = set()
+        highway_list : set[str] = set()
+        name_list : set[str] = set()
         maxspeed_dict: dict[str, float] = {}
-        def _add_list(l: list[str], item: str):
-            if item not in l:
-                l.append(item)
         for road in layer_roads.selectedFeatures():
             road_layer = road.attribute("layer")
             if buffer_layer != road_layer:
@@ -386,14 +383,14 @@ def sidepath_dict(
             road_highway = road.attribute("highway")
             road_name = road.attribute("name")
             road_maxspeed = d.getNumber(road.attribute("maxspeed"))
-            _add_list(id_list, road_id)
-            _add_list(highway_list, road_highway)
+            id_list.add(road_id)
+            highway_list.add(road_highway)
             if (
                 road_highway not in maxspeed_dict
                 or maxspeed_dict[road_highway] < road_maxspeed
             ):
                 maxspeed_dict[road_highway] = road_maxspeed
-            _add_list(name_list, road_name)
+            name_list.add(road_name)
         for road_id in id_list:
             buffer_dict['id'].setdefault(road_id, 0)
             buffer_dict['id'][road_id] += 1
