@@ -43,9 +43,11 @@
 --     
 --
 
+BEGIN;
 -- create temporary paths and roads table if required; otherwise we cannot define some functions below
-CREATE TEMP TABLE IF NOT EXISTS  _sidepath_estimation_paths(id bigint, geom geometry, tags jsonb);
-CREATE TEMP TABLE IF NOT EXISTS  _sidepath_estimation_roads(id bigint, geom geometry, tags jsonb);
+
+CREATE TEMP TABLE IF NOT EXISTS  _sidepath_estimation_paths(id bigint, geom geometry, tags jsonb) ON COMMIT DROP;
+CREATE TEMP TABLE IF NOT EXISTS  _sidepath_estimation_roads(id bigint, geom geometry, tags jsonb) ON COMMIT DROP;
 
 CREATE SEQUENCE IF NOT EXISTS checkpoint_nr_sequence;
 
@@ -270,18 +272,29 @@ CREATE OR REPLACE FUNCTION sidepath_dict_jsonl(buffer_distance float, buffer_siz
   GROUP BY id;
 $$ LANGUAGE SQL;
 
-CREATE OR REPLACE FUNCTION sidepath_idlist_yes(buffer_distance float, buffer_size float) RETURNS TABLE (id bigint) AS $$
-  SELECT id FROM (
+CREATE OR REPLACE FUNCTION sidepath_idlist_yes(buffer_distance float, buffer_size float) RETURNS TABLE (osm_id bigint) AS $$
+  SELECT id as osm_id FROM (
     SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_checkpoints_and_roads_join(buffer_distance, buffer_size)
     GROUP BY id
   )
   WHERE sidepath_dict_is_sidepath(entry);
 $$ LANGUAGE SQL;
 
-CREATE OR REPLACE FUNCTION sidepath_idlist_no(buffer_distance float, buffer_size float) RETURNS TABLE (id bigint) AS $$
-  SELECT id FROM (
+CREATE OR REPLACE FUNCTION sidepath_idlist_no(buffer_distance float, buffer_size float) RETURNS TABLE (osm_id bigint) AS $$
+  SELECT id as osm_id FROM (
     SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_checkpoints_and_roads_left_outer_join(buffer_distance, buffer_size)
     GROUP BY id
   )
   WHERE entry IS NULL OR NOT sidepath_dict_is_sidepath(entry);
 $$ LANGUAGE SQL;
+
+CREATE OR REPLACE FUNCTION sidepath_csv(buffer_distance float, buffer_size float)
+  RETURNS TABLE (osm_id text, is_sidepath_estimation text) AS $$
+    SELECT id::text as osm_id, sidepath_dict_is_sidepath(entry)::text FROM (
+      SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_checkpoints_and_roads_join(buffer_distance, buffer_size)
+      GROUP BY id
+    )
+  
+$$ LANGUAGE SQL;
+
+COMMIT;
