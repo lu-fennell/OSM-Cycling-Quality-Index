@@ -21,7 +21,7 @@ CREATE TEMPORARY VIEW _sidepath_estimation_paths as SELECT * FROM :paths_table;
 \if :{?roads_table}
 CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
 \else
-  \set roads_table _sidepath_estimation_paths
+  \set roads_table _sidepath_estimation_roads
 \endif
 
 -- reset checkpoint_nr_sequence
@@ -41,7 +41,7 @@ SELECT setval('checkpoint_nr_sequence', 1);
 -- time europe/germany:  23m43.291s
 \pset format unaligned
 \pset tuples_only on
-SELECT sidepath_dict_jsonl(:buffer_distance, :buffer_size)
+SELECT sidepath_dict_jsonl(:buffer_distance, :buffer_size);
 
 -- -- time europe/germany: 14m29.783s
 -- \pset format csv
