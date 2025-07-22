@@ -274,15 +274,17 @@ $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_idlist_yes(buffer_distance float, buffer_size float) RETURNS TABLE (osm_id bigint) AS $$
   SELECT id as osm_id FROM (
-    SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_checkpoints_and_roads_join(buffer_distance, buffer_size)
+    SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry
+    FROM sidepath_dict_checkpoints_and_roads_left_outer_join(buffer_distance, buffer_size)
     GROUP BY id
   )
-  WHERE sidepath_dict_is_sidepath(entry);
+  WHERE entry IS NOT NULL AND sidepath_dict_is_sidepath(entry);
 $$ LANGUAGE SQL;
 
 CREATE OR REPLACE FUNCTION sidepath_idlist_no(buffer_distance float, buffer_size float) RETURNS TABLE (osm_id bigint) AS $$
   SELECT id as osm_id FROM (
-    SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry FROM sidepath_dict_checkpoints_and_roads_left_outer_join(buffer_distance, buffer_size)
+    SELECT id, sidepath_dict_agg(nr, layer, road_id, tags) AS entry
+    FROM sidepath_dict_checkpoints_and_roads_left_outer_join(buffer_distance, buffer_size)
     GROUP BY id
   )
   WHERE entry IS NULL OR NOT sidepath_dict_is_sidepath(entry);

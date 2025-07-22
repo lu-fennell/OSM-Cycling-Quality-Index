@@ -26,6 +26,16 @@ CREATE TEMPORARY VIEW _sidepath_estimation_roads as SELECT * FROM :roads_table;
 
 -- reset checkpoint_nr_sequence
 SELECT setval('checkpoint_nr_sequence', 1);
+
+-- check format arg
+SELECT 
+  :'format' = 'sidepath_dict' as sidepath_dict,
+  :'format' = 'is_sidepath_no' as is_sidepath_no,
+  :'format' = 'is_sidepath_yes' as is_sidepath_yes,
+  :'format' = 'is_sidepath_csv' as is_sidepath_csv
+\gset
+
+\echo :format :sidepath_dict
  
 -- set output to outfile
 \if :{?outfile}
@@ -34,32 +44,40 @@ SELECT setval('checkpoint_nr_sequence', 1);
   \o
 \endif
 
-\echo `date` 'Start generating sidepath dict'
 
--- query to generate the sidepath_dict
 
--- time europe/germany:  23m43.291s
+\if :sidepath_dict
+\echo `date` 'Start generating sidepath_dict'
 \pset format unaligned
 \pset tuples_only on
 SELECT sidepath_dict_jsonl(:buffer_distance, :buffer_size);
 
--- -- time europe/germany: 14m29.783s
--- \pset format csv
--- \pset tuples_only off
--- SELECT * FROM sidepath_idlist_yes(:buffer_distance, :buffer_size);
+\elif :is_sidepath_yes
+\echo `date` 'Start generating is_sidepath_yes'
+\pset format csv
+\pset tuples_only off
+SELECT * FROM sidepath_idlist_yes(:buffer_distance, :buffer_size);
 
-
--- -- time europe/germany: 23m44.947s
--- -- NOTE: slower than sidepath_idlist_yes (because of left outer join), but result is much smaller
--- \pset format csv
--- \pset tuples_only off
--- SELECT * FROM sidepath_idlist_no(:buffer_distance, :buffer_size);
+\elif :is_sidepath_no
+\echo `date` 'Start generating is_sidepath_no'
+\pset format csv
+\pset tuples_only off
+SELECT * FROM sidepath_idlist_no(:buffer_distance, :buffer_size);
 --
 
+\elif :is_sidepath_csv
+\echo `date` 'Start generating sidepath_csv'
 
--- \pset format csv
--- \pset tuples_only off
--- SELECT * FROM sidepath_csv(:buffer_distance, :buffer_size);
+\pset format csv
+\pset tuples_only off
+SELECT * FROM sidepath_csv(:buffer_distance, :buffer_size);
+
+\else
+
+\echo 'ERROR: please set variable "format" to one of: sidepath_dict|is_sidepath_yes|is_sidepath_no|is_sidepath_csv'
+\q
+
+\endif
 
 
 \echo `date` 'Done generating sidepath dict for' :paths_table 'and' :roads_table
